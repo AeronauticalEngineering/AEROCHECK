@@ -22,14 +22,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function updatePinDots() {
   const val = document.getElementById('loginPin').value || '';
+  const countLabel = document.getElementById('pinCountLabel');
+  if (countLabel) countLabel.innerText = `${val.length} / 4 หลัก`;
+
   const dots = document.querySelectorAll('#pinDotsDisplay .pin-dot');
   dots.forEach((dot, idx) => {
     if (idx < val.length) {
-      dot.classList.remove('bg-slate-300');
-      dot.classList.add('bg-blue-600', 'scale-110');
+      dot.style.backgroundColor = '#2563eb';
+      dot.style.transform = 'scale(1.15)';
     } else {
-      dot.classList.remove('bg-blue-600', 'scale-110');
-      dot.classList.add('bg-slate-300');
+      dot.style.backgroundColor = '#cbd5e1';
+      dot.style.transform = 'scale(1)';
     }
   });
 }
@@ -38,7 +41,7 @@ function pressPin(digit) {
   if (isLoggingIn) return;
   const pinInput = document.getElementById('loginPin');
   if (pinInput.value.length < 4) {
-    pinInput.value += digit;
+    pinInput.value += String(digit);
     updatePinDots();
 
     if (pinInput.value.length === 4) {
@@ -55,7 +58,9 @@ function pressPin(digit) {
         return;
       }
       isLoggingIn = true;
-      document.querySelector('#loginModal form').requestSubmit();
+      setTimeout(() => {
+        handleLogin({ preventDefault: () => {} });
+      }, 150);
     }
   }
 }
@@ -85,7 +90,7 @@ async function initData() {
 }
 
 async function handleLogin(e) {
-  e.preventDefault();
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
   const username = document.getElementById('loginUsername').value.trim();
   const pin = document.getElementById('loginPin').value.replace(/\D/g, '');
 
@@ -394,7 +399,10 @@ async function startRearCamera() {
   document.getElementById('cameraErrorBox').classList.add('hidden');
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showCameraError('เบราว์เซอร์ไม่รองรับการเข้าถึงกล้อง', 'กรุณาเปิดลิงก์นี้ผ่าน Safari หรือ Chrome และตรวจสอบว่าเชื่อมต่อแบบ HTTPS');
+    showCameraError(
+      'เบราว์เซอร์นี้ไม่รองรับการเปิดกล้องสด',
+      'หากเปิดผ่าน LINE ให้กดเปิดผ่าน Safari หรือ Chrome และตรวจสอบการเชื่อมต่อ HTTPS'
+    );
     return;
   }
 
@@ -402,42 +410,41 @@ async function startRearCamera() {
     await stopScannerSilently();
     document.getElementById('reader').innerHTML = '';
 
-    html5QrCode = new Html5Qrcode("reader", {
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-      verbose: false
-    });
+    html5QrCode = new Html5Qrcode("reader", { verbose: false });
 
-    await html5QrCode.start(
-      { facingMode: { ideal: "environment" } },
-      {
-        fps: 20,
-        qrbox: (vw, vh) => {
-          const edge = Math.min(240, Math.floor(Math.min(vw, vh) * 0.72));
-          return { width: edge, height: edge };
-        },
-        aspectRatio: 1.0,
-        disableFlip: false
-      },
-      async (decodedText) => {
-        if (!isScanning) return;
-        let extractedCode = decodedText.trim();
-        if (decodedText.includes('code=')) {
-          try {
-            extractedCode = new URL(decodedText).searchParams.get('code') || extractedCode;
-          } catch (_) {}
-        }
-        await stopScannerSilently();
-        openInspectScreen(extractedCode);
+    const onScanSuccess = async (decodedText) => {
+      if (!isScanning) return;
+      let extractedCode = decodedText.trim();
+      if (decodedText.includes('code=')) {
+        try {
+          extractedCode = new URL(decodedText).searchParams.get('code') || extractedCode;
+        } catch (_) {}
       }
-    );
+      await stopScannerSilently();
+      openInspectScreen(extractedCode);
+    };
+
+    const config = { fps: 15, qrbox: { width: 220, height: 220 } };
+
+    try {
+      await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+    } catch (_) {
+      const cameras = await Html5Qrcode.getCameras();
+      if (cameras && cameras.length > 0) {
+        const backCam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
+        await html5QrCode.start(backCam.id, config, onScanSuccess);
+      } else {
+        throw new Error('No camera found');
+      }
+    }
 
     isScanning = true;
   } catch (err) {
     isScanning = false;
-    const isDenied = String(err).toLowerCase().includes('permission') || String(err).toLowerCase().includes('notallowed');
+    const msg = String(err?.message || err);
     showCameraError(
-      isDenied ? 'ยังไม่ได้รับสิทธิ์ใช้งานกล้อง' : 'ไม่สามารถเปิดกล้องได้ในหน้าต่างนี้',
-      'กรุณาอนุญาตการใช้กล้อง หรือกดเปิดผ่าน Safari / Chrome เพื่อใช้งานกล้องสแกนได้เต็มรูปแบบ'
+      'ไม่สามารถเปิดกล้องได้ในหน้าต่างนี้',
+      `สาเหตุ: ${msg} — กรุณาอนุญาตการใช้กล้องในการตั้งค่าเบราว์เซอร์ หรือเปิดผ่าน Safari / Chrome`
     );
   }
 }
