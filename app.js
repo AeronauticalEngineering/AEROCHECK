@@ -16,6 +16,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// ฟังก์ชันแป้นตัวเลข PIN 4 หลัก
+function pressPin(digit) {
+  const pinInput = document.getElementById('loginPin');
+  if (pinInput.value.length < 4) {
+    pinInput.value += digit;
+  }
+}
+
+function backspacePin() {
+  const pinInput = document.getElementById('loginPin');
+  pinInput.value = pinInput.value.slice(0, -1);
+}
+
+function clearPin() {
+  document.getElementById('loginPin').value = '';
+}
+
 async function initData() {
   await fetchAssets();
   await loadAuditStatus();
@@ -30,7 +47,12 @@ async function initData() {
 async function handleLogin(e) {
   e.preventDefault();
   const username = document.getElementById('loginUsername').value.trim();
-  const pin = document.getElementById('loginPin').value.trim();
+  const pin = document.getElementById('loginPin').value.replace(/\D/g, '');
+
+  if (!/^\d{4}$/.test(pin)) {
+    Swal.fire({ icon: 'warning', title: 'รหัส PIN ไม่ถูกต้อง', text: 'กรุณากรอกตัวเลข 4 หลักเท่านั้น', timer: 1500, showConfirmButton: false });
+    return;
+  }
 
   Swal.fire({ title: 'กำลังตรวจสอบสิทธิ์...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
@@ -45,9 +67,18 @@ async function handleLogin(e) {
     if (json.status === 'success') {
       currentUser = { ...json.user, pin };
       localStorage.setItem('asset_user_session', JSON.stringify(currentUser));
+
+      // แสดงป้ายยินดีต้อนรับทันที แล้วค่อยโหลดข้อมูลเบื้องหลัง
       applyRolePermissions();
-      await initData();
-      Swal.fire({ icon: 'success', title: `ยินดีต้อนรับ ${currentUser.fullName}`, timer: 1200, showConfirmButton: false });
+      Swal.fire({
+        icon: 'success',
+        title: `ยินดีต้อนรับ ${currentUser.fullName}`,
+        toast: true,
+        position: 'top',
+        timer: 1000,
+        showConfirmButton: false
+      });
+      initData();
     } else {
       Swal.fire('เข้าสู่ระบบไม่สำเร็จ', json.message, 'error');
     }
@@ -146,12 +177,24 @@ function toggleScanner() {
 
   if (!isScanning) {
     readerDiv.classList.remove('hidden');
-    html5QrCode = new Html5Qrcode("reader");
+    html5QrCode = new Html5Qrcode("reader", {
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      verbose: false
+    });
     html5QrCode.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
+      {
+        fps: 20,
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const w = Math.min(300, Math.floor(viewfinderWidth * 0.8));
+          const h = Math.min(220, Math.floor(viewfinderHeight * 0.65));
+          return { width: w, height: h };
+        },
+        aspectRatio: 1.333,
+        disableFlip: false
+      },
       (decodedText) => {
-        let extractedCode = decodedText;
+        let extractedCode = decodedText.trim();
         if (decodedText.includes('code=')) {
           extractedCode = new URL(decodedText).searchParams.get('code');
         }
@@ -167,11 +210,12 @@ function toggleScanner() {
     });
   } else {
     html5QrCode.stop().then(() => {
+      html5QrCode.clear();
       readerDiv.classList.add('hidden');
       isScanning = false;
       btn.innerHTML = '<i class="bi bi-camera-video"></i> เปิดกล้องสแกน';
       btn.classList.replace('bg-red-600', 'bg-orange-500');
-    });
+    }).catch(() => {});
   }
 }
 
@@ -479,6 +523,7 @@ function toggleSelectAllQR(master) {
   document.querySelectorAll('.qr-checkbox').forEach(cb => cb.checked = master.checked);
 }
 
+// พิมพ์สติกเกอร์ QR Code แสดงชื่อครุภัณฑ์เต็มทุกตัวอักษร
 function printSelectedQRCodes() {
   const checked = Array.from(document.querySelectorAll('.qr-checkbox:checked')).map(cb => cb.value);
   if (checked.length === 0) {
@@ -493,20 +538,20 @@ function printSelectedQRCodes() {
   checked.forEach((code, i) => {
     const asset = allAssets.find(a => a.assetCode === code);
     const box = document.createElement('div');
-    box.className = 'border border-black p-2 flex flex-col items-center text-center break-inside-avoid';
+    box.className = 'border border-black p-2.5 flex flex-col items-center text-center break-inside-avoid bg-white';
     box.innerHTML = `
-      <div id="qr-${i}" class="mb-1"></div>
-      <div class="font-bold text-xs font-mono">${asset.assetCode}</div>
-      <div class="text-[10px] line-clamp-1">${asset.assetName}</div>
+      <div id="qr-${i}" class="mb-1.5"></div>
+      <div class="font-bold text-xs font-mono text-black">${asset.assetCode}</div>
+      <div class="text-[11px] text-black leading-snug break-words whitespace-normal w-full mt-0.5">${asset.assetName}</div>
     `;
     grid.appendChild(box);
 
     new QRCode(document.getElementById(`qr-${i}`), {
       text: `${baseUrl}?code=${encodeURIComponent(asset.assetCode)}`,
-      width: 90,
-      height: 90
+      width: 92,
+      height: 92
     });
   });
 
-  setTimeout(() => window.print(), 500);
+  setTimeout(() => window.print(), 600);
 }
