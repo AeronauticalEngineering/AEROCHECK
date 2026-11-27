@@ -34,12 +34,12 @@
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">ชื่อผู้ใช้ (Username)</label>
-          <input type="text" id="loginUsername" required placeholder="ระบุชื่อผู้ใช้" 
+          <input type="text" id="loginUsername" required placeholder="ระบุชื่อผู้ใช้"
             class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-orange-500">
         </div>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">รหัสผ่าน (PIN)</label>
-          <input type="password" id="loginPin" required placeholder="••••" 
+          <input type="password" id="loginPin" required placeholder="••••"
             class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-orange-500">
         </div>
         <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl shadow transition">
@@ -75,8 +75,8 @@
 
   <!-- Main Content -->
   <main class="max-w-6xl mx-auto p-4 no-print">
-    
-    <!-- Tab 1: Scan & Audit (สำหรับ User และ Admin) -->
+
+    <!-- Tab 1: Scan & Audit -->
     <section id="tab-scan" class="hidden space-y-4">
       <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
         <div class="flex justify-between items-center mb-3">
@@ -85,11 +85,11 @@
             <i class="bi bi-camera-video"></i> เปิดกล้องสแกน
           </button>
         </div>
-        
+
         <div id="reader" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden hidden mb-3 border-2 border-orange-400"></div>
 
         <div class="flex gap-2">
-          <input type="text" id="manualCodeInput" placeholder="หรือพิมพ์รหัสครุภัณฑ์ เช่น 7440-001-8710-6110" 
+          <input type="text" id="manualCodeInput" placeholder="หรือพิมพ์รหัสครุภัณฑ์ เช่น 7440-001-8710-6110"
             class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
           <button onclick="searchAssetManual()" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-700">
             ค้นหา
@@ -161,9 +161,8 @@
       </div>
     </section>
 
-    <!-- Tab 2: Executive Dashboard & Report (สำหรับผู้บริหารและ Admin) -->
+    <!-- Tab 2: Executive Dashboard & Report -->
     <section id="tab-report" class="hidden space-y-4">
-      <!-- KPI Cards -->
       <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
           <p class="text-xs text-slate-500">ครุภัณฑ์ในบัญชี (ชิ้น)</p>
@@ -187,9 +186,8 @@
         </div>
       </div>
 
-      <!-- แถบสรุปสถานะการตรวจพบ -->
       <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <h3 class="text-xs font-semibold text-slate-600 mb-3">สรุปผลสภาพครุภัณฑ์ที่ตรวจพบในปีงบประมาณที่เลือก</h3>
+        <h3 class="text-xs font-semibold text-slate-600 mb-3">สรุปผลสภาพครุภัณฑ์ที่ตรวจพบในปีที่เลือก</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
           <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
             <span class="text-xs text-emerald-700">ใช้งานได้ปกติ</span>
@@ -210,7 +208,6 @@
         </div>
       </div>
 
-      <!-- ตารางรายละเอียดรายงาน -->
       <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
           <div class="flex flex-wrap gap-2">
@@ -246,7 +243,7 @@
       </div>
     </section>
 
-    <!-- Tab 3: Admin Management (สำหรับ Admin เท่านั้น) -->
+    <!-- Tab 3: Admin Management -->
     <section id="tab-admin" class="hidden space-y-4">
       <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap justify-between items-center gap-3">
         <div>
@@ -285,7 +282,7 @@
 
   </main>
 
-  <!-- Bottom Navigation Bar (แสดงปุ่มตาม Role) -->
+  <!-- Bottom Navigation Bar -->
   <nav id="bottomNav" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around py-2 z-40 no-print shadow-lg">
     <button onclick="switchTab('scan')" id="nav-scan" class="hidden flex-col items-center text-orange-600 font-medium text-xs">
       <i class="bi bi-qr-code-scan text-xl mb-0.5"></i> สแกนตรวจ
