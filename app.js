@@ -4,9 +4,9 @@ let allAssets = [];
 let auditedMap = {};
 let html5QrCode = null;
 let isScanning = false;
-let torchEnabled = false;
 let currentUser = null;
 let compressedImageBase64 = '';
+let tempAvatarBase64 = '';
 let latestStats = { total: 599, audited: 0 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -64,7 +64,16 @@ async function handleLogin(e) {
     Swal.close();
 
     if (json.status === 'success') {
-      currentUser = { ...json.user, pin };
+      const savedProfiles = JSON.parse(localStorage.getItem('asset_user_profiles') || '{}');
+      const custom = savedProfiles[json.user.username] || {};
+      currentUser = {
+        ...json.user,
+        pin,
+        org: custom.org || json.user.org || 'กองวิชาวิศวกรรมการบิน',
+        email: custom.email || json.user.email || '',
+        phone: custom.phone || json.user.phone || '',
+        avatar: custom.avatar || json.user.avatar || ''
+      };
       localStorage.setItem('asset_user_session', JSON.stringify(currentUser));
 
       applyRolePermissions();
@@ -85,13 +94,18 @@ async function handleLogin(e) {
   }
 }
 
+function getRoleLabel(role) {
+  const map = {
+    admin: 'ผู้ดูแลระบบ (Admin)',
+    user: 'เจ้าหน้าที่ตรวจนับ (User)',
+    exec: 'ผู้บริหาร (Exec)'
+  };
+  return map[role] || role;
+}
+
 function applyRolePermissions() {
   document.getElementById('loginModal').classList.add('hidden');
   document.getElementById('appContainer').classList.remove('hidden');
-
-  const roleLabels = { admin: 'ผู้ดูแลระบบ', user: 'เจ้าหน้าที่ตรวจนับ', exec: 'ผู้บริหาร' };
-  document.getElementById('profFullName').innerText = currentUser.fullName;
-  document.getElementById('profRole').innerText = `สิทธิ์การใช้งาน: ${roleLabels[currentUser.role] || currentUser.role}`;
   document.getElementById('formInspector').value = currentUser.fullName;
 
   const btnAdmin = document.getElementById('btnOpenAdminPanel');
@@ -101,7 +115,130 @@ function applyRolePermissions() {
     btnAdmin.classList.add('hidden');
   }
 
+  renderProfileUI();
   switchScreen('home');
+}
+
+function renderProfileUI() {
+  if (!currentUser) return;
+  const org = currentUser.org || 'ไม่ระบุหน่วยงาน';
+  const email = currentUser.email || '-';
+  const phone = currentUser.phone || '-';
+  const roleText = getRoleLabel(currentUser.role);
+
+  document.getElementById('profDisplayName').innerText = currentUser.fullName;
+  document.getElementById('profDisplayOrg').innerText = `หน่วยงาน: ${org}`;
+  document.getElementById('profDisplayRole').innerText = roleText;
+
+  document.getElementById('profViewEmail').innerText = email;
+  document.getElementById('profViewPhone').innerText = phone;
+  document.getElementById('profViewOrg').innerText = org;
+  document.getElementById('profViewRole').innerText = roleText;
+
+  const avatarImg = document.getElementById('profAvatarImg');
+  const avatarFallback = document.getElementById('profAvatarFallback');
+  if (currentUser.avatar) {
+    avatarImg.src = currentUser.avatar;
+    avatarImg.classList.remove('hidden');
+    avatarFallback.classList.add('hidden');
+  } else {
+    avatarImg.classList.add('hidden');
+    avatarFallback.classList.remove('hidden');
+  }
+}
+
+function toggleEditProfile() {
+  tempAvatarBase64 = currentUser.avatar || '';
+  document.getElementById('profileViewMode').classList.add('hidden');
+  document.getElementById('profileEditForm').classList.remove('hidden');
+  document.getElementById('profAvatarUploadLabel').classList.remove('hidden');
+
+  document.getElementById('profInputName').value = currentUser.fullName || '';
+  document.getElementById('profInputOrg').value = currentUser.org || '';
+  document.getElementById('profInputEmail').value = currentUser.email || '';
+  document.getElementById('profInputPhone').value = currentUser.phone || '';
+
+  const roleSelect = document.getElementById('profInputRole');
+  roleSelect.value = currentUser.role || 'user';
+  // ให้ Admin เป็นผู้แก้ไขสิทธิ์ได้เท่านั้น
+  roleSelect.disabled = currentUser.role !== 'admin';
+}
+
+function cancelEditProfile() {
+  tempAvatarBase64 = '';
+  document.getElementById('profileEditForm').classList.add('hidden');
+  document.getElementById('profileViewMode').classList.remove('hidden');
+  document.getElementById('profAvatarUploadLabel').classList.add('hidden');
+  renderProfileUI();
+}
+
+function handleAvatarChange(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const size = 240;
+      canvas.width = size;
+      canvas.height = size;
+      canvas.getContext('2d').drawImage(img, 0, 0, size, size);
+      tempAvatarBase64 = canvas.toDataURL('image/jpeg', 0.8);
+      const avatarImg = document.getElementById('profAvatarImg');
+      avatarImg.src = tempAvatarBase64;
+      avatarImg.classList.remove('hidden');
+      document.getElementById('profAvatarFallback').classList.add('hidden');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveProfileChanges(e) {
+  e.preventDefault();
+  const newName = document.getElementById('profInputName').value.trim();
+  const newOrg = document.getElementById('profInputOrg').value.trim();
+  const newEmail = document.getElementById('profInputEmail').value.trim();
+  const newPhone = document.getElementById('profInputPhone').value.trim();
+  const roleSelect = document.getElementById('profInputRole');
+  const newRole = currentUser.role === 'admin' ? roleSelect.value : currentUser.role;
+
+  currentUser = {
+    ...currentUser,
+    fullName: newName || currentUser.fullName,
+    org: newOrg,
+    email: newEmail,
+    phone: newPhone,
+    role: newRole,
+    avatar: tempAvatarBase64 || currentUser.avatar || ''
+  };
+
+  localStorage.setItem('asset_user_session', JSON.stringify(currentUser));
+  const savedProfiles = JSON.parse(localStorage.getItem('asset_user_profiles') || '{}');
+  savedProfiles[currentUser.username] = {
+    org: currentUser.org,
+    email: currentUser.email,
+    phone: currentUser.phone,
+    role: currentUser.role,
+    avatar: currentUser.avatar
+  };
+  localStorage.setItem('asset_user_profiles', JSON.stringify(savedProfiles));
+
+  document.getElementById('formInspector').value = currentUser.fullName;
+  document.getElementById('profileEditForm').classList.add('hidden');
+  document.getElementById('profileViewMode').classList.remove('hidden');
+  document.getElementById('profAvatarUploadLabel').classList.add('hidden');
+
+  const btnAdmin = document.getElementById('btnOpenAdminPanel');
+  if (currentUser.role === 'admin' || currentUser.role === 'exec') {
+    btnAdmin.classList.remove('hidden');
+  } else {
+    btnAdmin.classList.add('hidden');
+  }
+
+  renderProfileUI();
+  Swal.fire({ icon: 'success', title: 'บันทึกการเปลี่ยนแปลงแล้ว', timer: 1200, showConfirmButton: false });
 }
 
 function logout() {
@@ -118,7 +255,7 @@ function switchScreen(screenName) {
     stopScannerSilently();
   }
 
-  ['home', 'inspect', 'success', 'list', 'history', 'profile', 'admin'].forEach(s => {
+  ['home', 'scanner', 'inspect', 'success', 'list', 'history', 'profile', 'admin'].forEach(s => {
     const el = document.getElementById(`screen-${s}`);
     if (el) el.classList.add('hidden');
   });
@@ -139,6 +276,7 @@ function switchScreen(screenName) {
 
   if (screenName === 'list') renderAssetListScreen();
   if (screenName === 'history') renderHistoryScreen();
+  if (screenName === 'profile') renderProfileUI();
   if (screenName === 'admin') renderAdminTable();
 }
 
@@ -197,64 +335,115 @@ function updateSummaryCards() {
   document.getElementById('homePending').innerText = pending;
 }
 
-// เปิดหน้ากล้องสแกนเต็มหน้าจอและปิดกล้องอัตโนมัติเมื่ออ่าน QR สำเร็จ
-function openScannerScreen() {
+// เปิดกล้องหลัง พร้อมกรอบสแกนสี่เหลี่ยมตรงกลาง และแสดงกล่องแจ้งเตือนหากเปิดไม่ได้แทนจอดำ
+async function openScannerScreen() {
   switchScreen('scanner');
-  torchEnabled = false;
+  document.getElementById('cameraErrorBox').classList.add('hidden');
+  document.getElementById('scanFrameOverlay').classList.remove('hidden');
+  await startRearCamera();
+}
 
-  if (!html5QrCode) {
+async function startRearCamera() {
+  document.getElementById('cameraErrorBox').classList.add('hidden');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showCameraError('เบราว์เซอร์ไม่รองรับการเข้าถึงกล้อง', 'กรุณาเปิดลิงก์นี้ผ่าน Safari หรือ Chrome และตรวจสอบว่าเชื่อมต่อแบบ HTTPS');
+    return;
+  }
+
+  try {
+    await stopScannerSilently();
+    document.getElementById('reader').innerHTML = '';
+
     html5QrCode = new Html5Qrcode("reader", {
       experimentalFeatures: { useBarCodeDetectorIfSupported: true },
       verbose: false
     });
-  }
 
-  html5QrCode.start(
-    { facingMode: "environment" },
-    {
-      fps: 20,
-      qrbox: (vw, vh) => ({
-        width: Math.min(280, Math.floor(vw * 0.75)),
-        height: Math.min(280, Math.floor(vw * 0.75))
-      }),
-      aspectRatio: 1.0,
-      disableFlip: false
-    },
-    (decodedText) => {
-      let extractedCode = decodedText.trim();
-      if (decodedText.includes('code=')) {
-        extractedCode = new URL(decodedText).searchParams.get('code');
+    await html5QrCode.start(
+      { facingMode: { ideal: "environment" } },
+      {
+        fps: 20,
+        qrbox: (vw, vh) => {
+          const edge = Math.min(240, Math.floor(Math.min(vw, vh) * 0.72));
+          return { width: edge, height: edge };
+        },
+        aspectRatio: 1.0,
+        disableFlip: false
+      },
+      async (decodedText) => {
+        if (!isScanning) return;
+        let extractedCode = decodedText.trim();
+        if (decodedText.includes('code=')) {
+          try {
+            extractedCode = new URL(decodedText).searchParams.get('code') || extractedCode;
+          } catch (_) {}
+        }
+        await stopScannerSilently();
+        openInspectScreen(extractedCode);
       }
-      stopScannerSilently();
-      openInspectScreen(extractedCode);
-    }
-  ).then(() => {
+    );
+
     isScanning = true;
-  }).catch(() => {
-    Swal.fire('เปิดกล้องไม่สำเร็จ', 'กรุณาอนุญาตการเข้าถึงกล้องบนเบราว์เซอร์', 'warning');
-  });
-}
-
-function stopScannerSilently() {
-  if (html5QrCode && isScanning) {
-    html5QrCode.stop().then(() => {
-      html5QrCode.clear();
-    }).catch(() => {});
+  } catch (err) {
+    isScanning = false;
+    const isDenied = String(err).toLowerCase().includes('permission') || String(err).toLowerCase().includes('notallowed');
+    showCameraError(
+      isDenied ? 'ยังไม่ได้รับสิทธิ์ใช้งานกล้อง' : 'ไม่สามารถเปิดกล้องได้ในหน้าต่างนี้',
+      'กรุณาอนุญาตการใช้กล้อง หรือกดเปิดผ่าน Safari / Chrome เพื่อใช้งานกล้องสแกนได้เต็มรูปแบบ'
+    );
   }
+}
+
+function showCameraError(title, desc) {
+  document.getElementById('cameraErrorTitle').innerText = title;
+  document.getElementById('cameraErrorDesc').innerText = desc;
+  document.getElementById('cameraErrorBox').classList.remove('hidden');
+  document.getElementById('scanFrameOverlay').classList.add('hidden');
+}
+
+async function retryCamera() {
+  await startRearCamera();
+}
+
+function openInExternalBrowser() {
+  const url = window.location.href;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+async function stopScannerSilently() {
+  const cam = html5QrCode;
+  const active = isScanning;
   isScanning = false;
+  html5QrCode = null;
+
+  if (cam) {
+    try {
+      if (active) await cam.stop();
+    } catch (_) {}
+    try {
+      await cam.clear();
+    } catch (_) {}
+  }
+
+  // บังคับหยุด MediaStream ทุกตัวที่ค้างอยู่บน video element
+  const readerEl = document.getElementById('reader');
+  if (readerEl) {
+    readerEl.querySelectorAll('video').forEach(vid => {
+      if (vid.srcObject && typeof vid.srcObject.getTracks === 'function') {
+        vid.srcObject.getTracks().forEach(t => t.stop());
+      }
+      vid.srcObject = null;
+    });
+    readerEl.innerHTML = '';
+  }
 }
 
-function closeScannerScreen() {
-  stopScannerSilently();
+// ปุ่มย้อนกลับและปุ่มปิดต้องหยุดกล้องก่อนกลับหน้าหลักเสมอ
+async function closeScannerScreen() {
+  document.getElementById('screen-scanner').classList.add('hidden');
   switchScreen('home');
-}
-
-function toggleTorch() {
-  if (!html5QrCode || !isScanning) return;
-  torchEnabled = !torchEnabled;
-  html5QrCode.applyVideoConstraints({
-    advanced: [{ torch: torchEnabled }]
-  }).catch(() => {});
+  await stopScannerSilently();
 }
 
 function promptManualCode() {
@@ -265,9 +454,9 @@ function promptManualCode() {
     showCancelButton: true,
     confirmButtonText: 'ค้นหา',
     cancelButtonText: 'ยกเลิก'
-  }).then(res => {
+  }).then(async res => {
     if (res.isConfirmed && res.value && res.value.trim()) {
-      stopScannerSilently();
+      await stopScannerSilently();
       openInspectScreen(res.value.trim());
     }
   });
@@ -279,7 +468,6 @@ function searchAssetManual(rawCode) {
   openInspectScreen(code);
 }
 
-// เปิดหน้า 03 ตรวจครุภัณฑ์ พร้อมแสดงข้อมูลทะเบียนเดิม
 function openInspectScreen(code) {
   const asset = allAssets.find(a => a.assetCode.toLowerCase() === String(code).trim().toLowerCase());
   if (!asset) {
@@ -319,7 +507,6 @@ function openInspectScreen(code) {
   selectStatusBtn(initStatus);
 }
 
-// เลือกสถานะด้วยปุ่มขนาดใหญ่แทน Dropdown
 function selectStatusBtn(statusValue) {
   document.getElementById('formStatus').value = statusValue;
 
@@ -474,7 +661,7 @@ function renderAdminTable() {
         <td class="p-2">${asset.assetName}</td>
         <td class="p-2">${statusBadge}</td>
         <td class="p-2 text-right">
-          <button onclick="openAdminModal('edit', ${idx})" class="text-blue-600 hover:underline text-xs font-medium">แก้ไข/จำหน่าย</button>
+          <button type="button" onclick="openAdminModal('edit', ${idx})" class="text-blue-600 hover:underline text-xs font-medium">แก้ไข/จำหน่าย</button>
         </td>
       </tr>
     `;
