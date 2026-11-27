@@ -4,8 +4,10 @@ let allAssets = [];
 let auditedMap = {};
 let html5QrCode = null;
 let isScanning = false;
+let torchEnabled = false;
 let currentUser = null;
 let compressedImageBase64 = '';
+let latestStats = { total: 599, audited: 0 };
 
 document.addEventListener('DOMContentLoaded', async () => {
   const savedSession = localStorage.getItem('asset_user_session');
@@ -37,7 +39,7 @@ async function initData() {
   const urlParams = new URLSearchParams(window.location.search);
   const codeParam = urlParams.get('code');
   if (codeParam && currentUser && (currentUser.role === 'admin' || currentUser.role === 'user')) {
-    openAuditForm(codeParam);
+    openInspectScreen(codeParam);
   }
 }
 
@@ -88,40 +90,22 @@ function applyRolePermissions() {
   document.getElementById('appContainer').classList.remove('hidden');
 
   const roleLabels = { admin: 'ผู้ดูแลระบบ', user: 'เจ้าหน้าที่ตรวจนับ', exec: 'ผู้บริหาร' };
-  document.getElementById('topUserInfo').innerText = `${currentUser.fullName} • ${roleLabels[currentUser.role] || currentUser.role}`;
-  document.getElementById('sidebarUserName').innerText = currentUser.fullName;
+  document.getElementById('profFullName').innerText = currentUser.fullName;
+  document.getElementById('profRole').innerText = `สิทธิ์การใช้งาน: ${roleLabels[currentUser.role] || currentUser.role}`;
   document.getElementById('formInspector').value = currentUser.fullName;
 
-  const sidebar = document.getElementById('adminSidebar');
-  const auditView = document.getElementById('view-audit-2col');
-  const adminPanel = document.getElementById('view-admin-panel');
-
-  if (currentUser.role === 'admin') {
-    sidebar.classList.remove('hidden');
-    sidebar.classList.add('flex');
-    auditView.classList.add('hidden');
-    adminPanel.classList.remove('hidden');
-    switchAdminView('dashboard');
-  } else if (currentUser.role === 'user') {
-    sidebar.classList.add('hidden');
-    sidebar.classList.remove('flex');
-    auditView.classList.remove('hidden');
-    adminPanel.classList.add('hidden');
-  } else if (currentUser.role === 'exec') {
-    sidebar.classList.add('hidden');
-    sidebar.classList.remove('flex');
-    auditView.classList.add('hidden');
-    adminPanel.classList.remove('hidden');
-    document.getElementById('adm-sub-dashboard').classList.remove('hidden');
-    document.getElementById('adm-sub-table').classList.remove('hidden');
+  const btnAdmin = document.getElementById('btnOpenAdminPanel');
+  if (currentUser.role === 'admin' || currentUser.role === 'exec') {
+    btnAdmin.classList.remove('hidden');
+  } else {
+    btnAdmin.classList.add('hidden');
   }
+
+  switchScreen('home');
 }
 
 function logout() {
-  if (isScanning && html5QrCode) {
-    html5QrCode.stop().catch(() => {});
-    isScanning = false;
-  }
+  stopScannerSilently();
   localStorage.removeItem('asset_user_session');
   currentUser = null;
   document.getElementById('appContainer').classList.add('hidden');
@@ -129,36 +113,33 @@ function logout() {
   document.getElementById('loginPin').value = '';
 }
 
-function switchAdminView(viewName) {
-  document.querySelectorAll('.adm-nav-btn').forEach(btn => {
-    btn.classList.remove('bg-blue-600', 'text-white', 'font-medium');
-  });
-  const activeBtn = document.getElementById(`adm-nav-${viewName}`);
-  if (activeBtn) activeBtn.classList.add('bg-blue-600', 'text-white', 'font-medium');
-
-  document.getElementById('adm-sub-dashboard').classList.add('hidden');
-  document.getElementById('adm-sub-cycles').classList.add('hidden');
-  document.getElementById('adm-sub-table').classList.add('hidden');
-
-  if (viewName === 'dashboard') {
-    document.getElementById('adm-sub-dashboard').classList.remove('hidden');
-  } else if (viewName === 'cycles') {
-    document.getElementById('adm-sub-cycles').classList.remove('hidden');
-  } else {
-    document.getElementById('adm-sub-table').classList.remove('hidden');
-    const titles = {
-      assets: ['ทะเบียนครุภัณฑ์', 'เพิ่ม แก้ไข หรือจำหน่ายครุภัณฑ์ในฐานข้อมูล'],
-      results: ['ผลการตรวจประจำปี', 'ตรวจสอบสถานะการสแกนตรวจนับแยกตามรายการ'],
-      locations: ['ความคืบหน้าแยกตามสถานที่', 'ค้นหาและตรวจสอบครุภัณฑ์ตามสถานที่ตั้ง'],
-      holders: ['ผู้ถือครองครุภัณฑ์', 'ค้นหาและตรวจสอบผู้รับผิดชอบครุภัณฑ์'],
-      qrcode: ['พิมพ์สติกเกอร์ QR Code', 'ติ๊กเลือกรายการครุภัณฑ์แล้วกดพิมพ์ QR Code'],
-      report: ['รายงานสรุปผล', 'ดูข้อมูลและส่งออกรายงาน CSV']
-    };
-    const [t, s] = titles[viewName] || ['ทะเบียนครุภัณฑ์', ''];
-    document.getElementById('admTableTitle').innerText = t;
-    document.getElementById('admTableSubtitle').innerText = s;
-    renderAdminTable();
+function switchScreen(screenName) {
+  if (screenName !== 'scanner') {
+    stopScannerSilently();
   }
+
+  ['home', 'inspect', 'success', 'list', 'history', 'profile', 'admin'].forEach(s => {
+    const el = document.getElementById(`screen-${s}`);
+    if (el) el.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.bnav-btn').forEach(btn => {
+    btn.classList.remove('text-blue-600');
+    btn.classList.add('text-slate-400');
+  });
+
+  const activeNav = document.getElementById(`bnav-${screenName}`);
+  if (activeNav) {
+    activeNav.classList.remove('text-slate-400');
+    activeNav.classList.add('text-blue-600');
+  }
+
+  const target = document.getElementById(`screen-${screenName}`);
+  if (target) target.classList.remove('hidden');
+
+  if (screenName === 'list') renderAssetListScreen();
+  if (screenName === 'history') renderHistoryScreen();
+  if (screenName === 'admin') renderAdminTable();
 }
 
 async function fetchAssets() {
@@ -167,6 +148,8 @@ async function fetchAssets() {
     const json = await res.json();
     if (json.status === 'success') {
       allAssets = json.data;
+      updateSummaryCards();
+      renderAssetListScreen();
       renderAdminTable();
     }
   } catch (err) {
@@ -176,16 +159,15 @@ async function fetchAssets() {
 
 async function loadAuditStatus() {
   const year = document.getElementById('auditYear').value;
-  document.getElementById('cardCycleYear').innerText = year;
-  document.getElementById('dashYearBadge').innerText = `ปี ${year}`;
-
+  document.getElementById('homeCycleYear').innerText = year;
   try {
     const res = await fetch(`${API_URL}?action=getAuditReport&year=${year}`);
     const json = await res.json();
     if (json.status === 'success') {
       auditedMap = json.auditedMap;
-      updateAllStats(json.totalAssets, json.auditedCount);
-      renderRecentAudited();
+      latestStats = { total: json.totalAssets, audited: json.auditedCount };
+      updateSummaryCards();
+      renderHistoryScreen();
       renderAdminTable();
     }
   } catch (err) {
@@ -193,150 +175,122 @@ async function loadAuditStatus() {
   }
 }
 
-function updateAllStats(total, audited) {
+function updateSummaryCards() {
+  const total = latestStats.total || 0;
+  const audited = latestStats.audited || 0;
   const pending = Math.max(0, total - audited);
-  const percent = total > 0 ? Math.round((audited / total) * 100) : 0;
+  const percent = total > 0 ? Number(((audited / total) * 100).toFixed(1)) : 0;
 
-  let normal = 0, damaged = 0, lost = 0, issue = 0;
+  let normal = 0, damaged = 0, lost = 0;
   Object.values(auditedMap).forEach(log => {
     if (log.status === 'ใช้งานได้') normal++;
-    else if (log.status === 'ชำรุด') { damaged++; issue++; }
-    else if (log.status === 'สูญหาย') { lost++; issue++; }
-    else if (log.status === 'เสื่อมสภาพ/รอจำหน่าย') issue++;
+    else if (log.status === 'ชำรุด' || log.status === 'เสื่อมสภาพ/รอจำหน่าย') damaged++;
+    else if (log.status === 'สูญหาย') lost++;
   });
 
-  // อัปเดตการ์ดฝั่งสแกน (ภาพที่ 2)
-  document.getElementById('cardProgressPercent').innerText = `${percent}%`;
-  document.getElementById('cardProgressBar').style.width = `${percent}%`;
-  document.getElementById('cardProgressRatio').innerText = `${audited} / ${total} รายการ`;
-  document.getElementById('miniNormal').innerText = normal;
-  document.getElementById('miniDamaged').innerText = damaged;
-  document.getElementById('miniLost').innerText = lost;
-  document.getElementById('miniPending').innerText = pending;
-
-  // อัปเดตหน้า Inspection Dashboard (ภาพที่ 3)
-  document.getElementById('dashTotal').innerText = total;
-  document.getElementById('dashAudited').innerText = audited;
-  document.getElementById('dashPending').innerText = pending;
-  document.getElementById('dashIssue').innerText = issue;
-  document.getElementById('donutPercent').innerText = `${percent}%`;
-  document.getElementById('donutAuditedText').innerText = audited;
-  document.getElementById('donutPendingText').innerText = pending;
-  document.getElementById('donutChart').style.background = `conic-gradient(#16a34a 0% ${percent}%, #e2e8f0 ${percent}% 100%)`;
-
-  // อัปเดตหน้าจัดการรอบตรวจประจำปี (ภาพที่ 4)
-  document.getElementById('cycle2570Summary').innerText = `ตรวจแล้ว ${audited} / ${total} รายการ (${percent}%)`;
-  document.getElementById('cycle2570Bar').style.width = `${percent}%`;
-
-  // ความคืบหน้าแยกตามสถานที่
-  const activeAssets = allAssets.filter(a => a.status !== 'จำหน่าย');
-  const locMap = {};
-  activeAssets.forEach(a => {
-    const loc = (auditedMap[a.assetCode]?.location || a.location || 'ไม่ระบุสถานที่').trim();
-    if (!locMap[loc]) locMap[loc] = { total: 0, done: 0 };
-    locMap[loc].total++;
-    if (auditedMap[a.assetCode]) locMap[loc].done++;
-  });
-
-  const locContainer = document.getElementById('locationProgressList');
-  locContainer.innerHTML = '';
-  Object.entries(locMap).slice(0, 6).forEach(([loc, st]) => {
-    const p = st.total > 0 ? Math.round((st.done / st.total) * 100) : 0;
-    const barColor = p === 100 ? 'bg-emerald-600' : 'bg-blue-600';
-    locContainer.innerHTML += `
-      <div>
-        <div class="flex justify-between text-xs mb-1">
-          <span class="font-medium text-slate-700">${loc}</span>
-          <span class="font-semibold text-slate-800">${p}% (${st.done}/${st.total})</span>
-        </div>
-        <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-          <div class="${barColor} h-full rounded-full" style="width: ${p}%"></div>
-        </div>
-      </div>
-    `;
-  });
+  document.getElementById('homeProgressPercent').innerText = `${percent}%`;
+  document.getElementById('homeProgressBar').style.width = `${percent}%`;
+  document.getElementById('homeProgressRatio').innerText = `${audited} / ${total} รายการ`;
+  document.getElementById('homeNormal').innerText = normal;
+  document.getElementById('homeDamaged').innerText = damaged;
+  document.getElementById('homeLost').innerText = lost;
+  document.getElementById('homePending').innerText = pending;
 }
 
-function renderRecentAudited() {
-  const container = document.getElementById('recentAuditedList');
-  const logs = Object.values(auditedMap).slice(-3).reverse();
-  if (logs.length === 0) {
-    container.innerHTML = `<div class="text-xs text-slate-400">ยังไม่มีรายการที่ตรวจในปีนี้</div>`;
-    return;
-  }
-  container.innerHTML = logs.map(l => `
-    <div class="flex items-center justify-between border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
-      <div>
-        <div class="font-semibold text-slate-800 text-xs">${l.assetName}</div>
-        <div class="text-[11px] text-slate-500 font-mono">${l.assetCode}</div>
-      </div>
-      <i class="bi bi-check-circle-fill text-emerald-600"></i>
-    </div>
-  `).join('');
-}
+// เปิดหน้ากล้องสแกนเต็มหน้าจอและปิดกล้องอัตโนมัติเมื่ออ่าน QR สำเร็จ
+function openScannerScreen() {
+  switchScreen('scanner');
+  torchEnabled = false;
 
-function toggleScanner() {
-  const readerDiv = document.getElementById('reader');
-  const btn = document.getElementById('btnToggleCam');
-
-  if (!isScanning) {
-    readerDiv.classList.remove('hidden');
+  if (!html5QrCode) {
     html5QrCode = new Html5Qrcode("reader", {
       experimentalFeatures: { useBarCodeDetectorIfSupported: true },
       verbose: false
     });
-    html5QrCode.start(
-      { facingMode: "environment" },
-      {
-        fps: 20,
-        qrbox: (vw, vh) => ({
-          width: Math.min(300, Math.floor(vw * 0.8)),
-          height: Math.min(220, Math.floor(vh * 0.65))
-        }),
-        aspectRatio: 1.333,
-        disableFlip: false
-      },
-      (decodedText) => {
-        let extractedCode = decodedText.trim();
-        if (decodedText.includes('code=')) {
-          extractedCode = new URL(decodedText).searchParams.get('code');
-        }
-        toggleScanner();
-        openAuditForm(extractedCode);
+  }
+
+  html5QrCode.start(
+    { facingMode: "environment" },
+    {
+      fps: 20,
+      qrbox: (vw, vh) => ({
+        width: Math.min(280, Math.floor(vw * 0.75)),
+        height: Math.min(280, Math.floor(vw * 0.75))
+      }),
+      aspectRatio: 1.0,
+      disableFlip: false
+    },
+    (decodedText) => {
+      let extractedCode = decodedText.trim();
+      if (decodedText.includes('code=')) {
+        extractedCode = new URL(decodedText).searchParams.get('code');
       }
-    ).then(() => {
-      isScanning = true;
-      btn.innerHTML = '<i class="bi bi-stop-circle text-xl"></i><span class="text-sm">ปิดกล้องสแกน</span>';
-      btn.classList.replace('bg-blue-600', 'bg-red-600');
-    }).catch(() => {
-      Swal.fire('เปิดกล้องไม่สำเร็จ', 'กรุณาอนุญาตการเข้าถึงกล้องบนเบราว์เซอร์', 'warning');
-    });
-  } else {
+      stopScannerSilently();
+      openInspectScreen(extractedCode);
+    }
+  ).then(() => {
+    isScanning = true;
+  }).catch(() => {
+    Swal.fire('เปิดกล้องไม่สำเร็จ', 'กรุณาอนุญาตการเข้าถึงกล้องบนเบราว์เซอร์', 'warning');
+  });
+}
+
+function stopScannerSilently() {
+  if (html5QrCode && isScanning) {
     html5QrCode.stop().then(() => {
       html5QrCode.clear();
-      readerDiv.classList.add('hidden');
-      isScanning = false;
-      btn.innerHTML = '<i class="bi bi-qr-code-scan text-xl"></i><span class="text-sm">สแกน QR Code</span>';
-      btn.classList.replace('bg-red-600', 'bg-blue-600');
     }).catch(() => {});
   }
+  isScanning = false;
 }
 
-function searchAssetManual() {
-  const code = document.getElementById('manualCodeInput').value.trim();
+function closeScannerScreen() {
+  stopScannerSilently();
+  switchScreen('home');
+}
+
+function toggleTorch() {
+  if (!html5QrCode || !isScanning) return;
+  torchEnabled = !torchEnabled;
+  html5QrCode.applyVideoConstraints({
+    advanced: [{ torch: torchEnabled }]
+  }).catch(() => {});
+}
+
+function promptManualCode() {
+  Swal.fire({
+    title: 'พิมพ์รหัสครุภัณฑ์',
+    input: 'text',
+    inputPlaceholder: 'เช่น 7440-001-8716-6110',
+    showCancelButton: true,
+    confirmButtonText: 'ค้นหา',
+    cancelButtonText: 'ยกเลิก'
+  }).then(res => {
+    if (res.isConfirmed && res.value && res.value.trim()) {
+      stopScannerSilently();
+      openInspectScreen(res.value.trim());
+    }
+  });
+}
+
+function searchAssetManual(rawCode) {
+  const code = String(rawCode || '').trim();
   if (!code) return;
-  openAuditForm(code);
+  openInspectScreen(code);
 }
 
-function openAuditForm(code) {
-  const asset = allAssets.find(a => a.assetCode === code);
+// เปิดหน้า 03 ตรวจครุภัณฑ์ พร้อมแสดงข้อมูลทะเบียนเดิม
+function openInspectScreen(code) {
+  const asset = allAssets.find(a => a.assetCode.toLowerCase() === String(code).trim().toLowerCase());
   if (!asset) {
     Swal.fire('ไม่พบข้อมูล', `ไม่พบรหัสครุภัณฑ์ "${code}" ในระบบ`, 'error');
     return;
   }
 
+  switchScreen('inspect');
   document.getElementById('dispName').innerText = asset.assetName;
   document.getElementById('dispCode').innerText = `รหัส ${asset.assetCode}`;
+  document.getElementById('dispBaselineInfo').innerText = `ทะเบียนเดิม: ${asset.holder || '-'} | ${asset.location || '-'}`;
   document.getElementById('badgeFound').classList.remove('hidden');
 
   const imgEl = document.getElementById('dispAssetImage');
@@ -353,14 +307,37 @@ function openAuditForm(code) {
 
   document.getElementById('formAssetCode').value = asset.assetCode;
   document.getElementById('formAssetName').value = asset.assetName;
-  document.getElementById('formStatus').value = asset.status === 'จำหน่าย' ? 'ใช้งานได้' : (asset.status || 'ใช้งานได้');
+  document.getElementById('formInspector').value = currentUser.fullName;
   document.getElementById('formHolder').value = asset.holder || asset.note || '';
   document.getElementById('formLocation').value = asset.location || '';
-  document.getElementById('formInspector').value = currentUser.fullName;
   document.getElementById('formNote').value = '';
   document.getElementById('formImage').value = '';
   document.getElementById('imagePreview').classList.add('hidden');
   compressedImageBase64 = '';
+
+  const initStatus = asset.status === 'ชำรุด' ? 'ชำรุด' : (asset.status === 'สูญหาย' ? 'สูญหาย' : 'ใช้งานได้');
+  selectStatusBtn(initStatus);
+}
+
+// เลือกสถานะด้วยปุ่มขนาดใหญ่แทน Dropdown
+function selectStatusBtn(statusValue) {
+  document.getElementById('formStatus').value = statusValue;
+
+  const btnNormal = document.getElementById('btnStatusNormal');
+  const btnDamaged = document.getElementById('btnStatusDamaged');
+  const btnLost = document.getElementById('btnStatusLost');
+
+  [btnNormal, btnDamaged, btnLost].forEach(b => {
+    b.className = 'status-choice border border-slate-200 bg-white text-slate-600 rounded-xl py-3 px-2 flex flex-col items-center justify-center gap-1 font-medium text-xs transition';
+  });
+
+  if (statusValue === 'ใช้งานได้') {
+    btnNormal.className = 'status-choice border-2 border-emerald-500 bg-emerald-50 text-emerald-700 rounded-xl py-3 px-2 flex flex-col items-center justify-center gap-1 font-semibold text-xs transition';
+  } else if (statusValue === 'ชำรุด') {
+    btnDamaged.className = 'status-choice border-2 border-orange-500 bg-orange-50 text-orange-700 rounded-xl py-3 px-2 flex flex-col items-center justify-center gap-1 font-semibold text-xs transition';
+  } else if (statusValue === 'สูญหาย') {
+    btnLost.className = 'status-choice border-2 border-red-500 bg-red-50 text-red-700 rounded-xl py-3 px-2 flex flex-col items-center justify-center gap-1 font-semibold text-xs transition';
+  }
 }
 
 function previewImage(event) {
@@ -388,11 +365,14 @@ function previewImage(event) {
 
 async function submitAuditForm(e) {
   e.preventDefault();
+  const assetName = document.getElementById('formAssetName').value;
+  const assetCode = document.getElementById('formAssetCode').value;
+
   const payload = {
     action: 'submitAudit',
     year: document.getElementById('auditYear').value,
-    assetCode: document.getElementById('formAssetCode').value,
-    assetName: document.getElementById('formAssetName').value,
+    assetCode,
+    assetName,
     status: document.getElementById('formStatus').value,
     holder: document.getElementById('formHolder').value.trim(),
     location: document.getElementById('formLocation').value.trim(),
@@ -404,14 +384,70 @@ async function submitAuditForm(e) {
   Swal.fire({ title: 'กำลังบันทึกข้อมูล...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
   const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
   const json = await res.json();
+  Swal.close();
 
   if (json.status === 'success') {
-    Swal.fire('สำเร็จ', 'บันทึกผลการตรวจเรียบร้อยแล้ว', 'success');
     await fetchAssets();
     await loadAuditStatus();
+    showSuccessScreen(assetName, assetCode);
   } else {
     Swal.fire('ผิดพลาด', json.message, 'error');
   }
+}
+
+function showSuccessScreen(name, code) {
+  const total = latestStats.total || 0;
+  const audited = latestStats.audited || 0;
+  const pct = total > 0 ? ((audited / total) * 100).toFixed(1) : 0;
+
+  document.getElementById('successAssetName').innerText = name;
+  document.getElementById('successAssetCode').innerText = `รหัส ${code}`;
+  document.getElementById('successPercentBadge').innerText = `${pct}%`;
+  document.getElementById('successRatioText').innerText = `${audited} / ${total} รายการ`;
+  document.getElementById('successProgressBar').style.width = `${pct}%`;
+
+  switchScreen('success');
+}
+
+function renderAssetListScreen() {
+  const q = (document.getElementById('listSearchInput')?.value || '').toLowerCase();
+  const wrap = document.getElementById('assetListCards');
+  if (!wrap) return;
+
+  const items = allAssets.filter(a => a.status !== 'จำหน่าย' && `${a.assetCode} ${a.assetName}`.toLowerCase().includes(q)).slice(0, 80);
+  wrap.innerHTML = items.map(a => {
+    const done = !!auditedMap[a.assetCode];
+    return `
+      <div onclick="openInspectScreen('${a.assetCode}')" class="bg-white rounded-xl p-3 border border-slate-200/80 flex items-center justify-between gap-2 cursor-pointer hover:border-blue-400">
+        <div class="min-w-0">
+          <div class="text-xs font-semibold text-slate-900 truncate">${a.assetName}</div>
+          <div class="text-[11px] text-slate-500 font-mono">${a.assetCode}</div>
+        </div>
+        <span class="text-[10px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+          ${done ? 'ตรวจแล้ว' : 'รอตรวจ'}
+        </span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderHistoryScreen() {
+  const wrap = document.getElementById('historyCards');
+  if (!wrap) return;
+  const logs = Object.values(auditedMap).reverse();
+  if (logs.length === 0) {
+    wrap.innerHTML = `<div class="bg-white rounded-xl p-4 text-xs text-slate-400 text-center">ยังไม่มีประวัติการตรวจในปีนี้</div>`;
+    return;
+  }
+  wrap.innerHTML = logs.map(l => `
+    <div class="bg-white rounded-xl p-3 border border-slate-200/80 flex items-center justify-between gap-2">
+      <div class="min-w-0">
+        <div class="text-xs font-semibold text-slate-900 truncate">${l.assetName}</div>
+        <div class="text-[11px] text-slate-500 font-mono">${l.assetCode} • ${l.auditDate || ''}</div>
+      </div>
+      <span class="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 flex-shrink-0">${l.status}</span>
+    </div>
+  `).join('');
 }
 
 function renderAdminTable() {
@@ -421,13 +457,10 @@ function renderAdminTable() {
   tbody.innerHTML = '';
 
   allAssets.forEach((asset, idx) => {
-    const log = auditedMap[asset.assetCode];
-    const holder = log ? log.holder : (asset.holder || asset.note || '-');
-    const loc = log ? log.location : (asset.location || '-');
-
-    const str = `${asset.assetCode} ${asset.assetName} ${holder} ${loc}`.toLowerCase();
+    const str = `${asset.assetCode} ${asset.assetName} ${asset.status}`.toLowerCase();
     if (keyword && !str.includes(keyword)) return;
 
+    const log = auditedMap[asset.assetCode];
     const statusBadge = asset.status === 'จำหน่าย'
       ? `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">จำหน่าย</span>`
       : (log
@@ -436,12 +469,11 @@ function renderAdminTable() {
 
     tbody.innerHTML += `
       <tr class="hover:bg-slate-50">
-        <td class="p-2.5"><input type="checkbox" class="qr-checkbox" value="${asset.assetCode}"></td>
-        <td class="p-2.5 font-mono text-xs">${asset.assetCode}</td>
-        <td class="p-2.5">${asset.assetName}</td>
-        <td class="p-2.5 text-xs text-slate-600">${holder} / ${loc}</td>
-        <td class="p-2.5">${statusBadge}</td>
-        <td class="p-2.5 text-right">
+        <td class="p-2"><input type="checkbox" class="qr-checkbox" value="${asset.assetCode}"></td>
+        <td class="p-2 font-mono text-xs">${asset.assetCode}</td>
+        <td class="p-2">${asset.assetName}</td>
+        <td class="p-2">${statusBadge}</td>
+        <td class="p-2 text-right">
           <button onclick="openAdminModal('edit', ${idx})" class="text-blue-600 hover:underline text-xs font-medium">แก้ไข/จำหน่าย</button>
         </td>
       </tr>
