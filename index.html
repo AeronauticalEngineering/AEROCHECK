@@ -15,34 +15,53 @@
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
-      body { background: white; }
+      body { background: white; margin: 0; padding: 0; }
     }
   </style>
 </head>
 <body class="text-slate-800 pb-24">
 
   <!-- Login Modal -->
-  <div id="loginModal" class="fixed inset-0 bg-slate-900/95 flex items-center justify-center z-50 p-4 no-print">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
-      <div class="text-center mb-6">
-        <div class="w-16 h-16 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+  <div id="loginModal" class="fixed inset-0 bg-slate-900/95 flex items-center justify-center z-50 p-4 no-print overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 my-auto">
+      <div class="text-center mb-4">
+        <div class="w-14 h-14 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
           <i class="bi bi-qr-code-scan text-3xl"></i>
         </div>
-        <h2 class="font-bold text-xl text-slate-900">ระบบตรวจครุภัณฑ์ประจำปี</h2>
-        <p class="text-xs text-slate-500 mt-1">เข้าสู่ระบบเพื่อตรวจสอบสิทธิ์การใช้งาน</p>
+        <h2 class="font-bold text-lg text-slate-900">ระบบตรวจครุภัณฑ์ประจำปี</h2>
+        <p class="text-xs text-slate-500 mt-0.5">ระบุชื่อผู้ใช้และรหัส PIN 4 หลัก</p>
       </div>
-      <form onsubmit="handleLogin(event)" class="space-y-4">
+      <form onsubmit="handleLogin(event)" class="space-y-3">
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">ชื่อผู้ใช้ (Username)</label>
           <input type="text" id="loginUsername" required placeholder="ระบุชื่อผู้ใช้"
-            class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-orange-500">
+            class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-orange-500">
         </div>
         <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">รหัสผ่าน (PIN)</label>
-          <input type="password" id="loginPin" required placeholder="••••"
-            class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-orange-500">
+          <label class="block text-xs font-medium text-slate-600 mb-1">รหัส PIN (ตัวเลข 4 หลักเท่านั้น)</label>
+          <input type="password" id="loginPin" required inputmode="numeric" pattern="\d{4}" maxlength="4"
+            oninput="this.value = this.value.replace(/\D/g, '').slice(0, 4)"
+            placeholder="••••"
+            class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-center tracking-[0.5em] font-bold text-lg focus:outline-none focus:border-orange-500">
         </div>
-        <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl shadow transition">
+
+        <!-- แป้นตัวเลข 0-9 สำหรับกด PIN 4 หลัก -->
+        <div class="grid grid-cols-3 gap-2 pt-1">
+          <button type="button" onclick="pressPin('1')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">1</button>
+          <button type="button" onclick="pressPin('2')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">2</button>
+          <button type="button" onclick="pressPin('3')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">3</button>
+          <button type="button" onclick="pressPin('4')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">4</button>
+          <button type="button" onclick="pressPin('5')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">5</button>
+          <button type="button" onclick="pressPin('6')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">6</button>
+          <button type="button" onclick="pressPin('7')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">7</button>
+          <button type="button" onclick="pressPin('8')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">8</button>
+          <button type="button" onclick="pressPin('9')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">9</button>
+          <button type="button" onclick="clearPin()" class="bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 rounded-xl text-xs transition">ล้าง</button>
+          <button type="button" onclick="pressPin('0')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">0</button>
+          <button type="button" onclick="backspacePin()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl text-base transition"><i class="bi bi-backspace"></i></button>
+        </div>
+
+        <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl shadow transition mt-2">
           เข้าสู่ระบบ
         </button>
       </form>
@@ -86,7 +105,7 @@
           </button>
         </div>
 
-        <div id="reader" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden hidden mb-3 border-2 border-orange-400"></div>
+        <div id="reader" class="w-full max-w-md mx-auto rounded-xl overflow-hidden hidden mb-3 border-2 border-orange-400"></div>
 
         <div class="flex gap-2">
           <input type="text" id="manualCodeInput" placeholder="หรือพิมพ์รหัสครุภัณฑ์ เช่น 7440-001-8710-6110"
@@ -369,9 +388,9 @@
     </div>
   </div>
 
-  <!-- พื้นที่สำหรับพิมพ์สติกเกอร์ QR Code -->
-  <div id="printArea" class="hidden print-only p-4">
-    <div id="qrGrid" class="grid grid-cols-3 gap-4"></div>
+  <!-- พื้นที่สำหรับพิมพ์สติกเกอร์ QR Code (แสดงชื่อเต็มไม่ตัดคำ) -->
+  <div id="printArea" class="hidden print-only p-3">
+    <div id="qrGrid" class="grid grid-cols-3 gap-3"></div>
   </div>
 
   <script src="app.js"></script>
