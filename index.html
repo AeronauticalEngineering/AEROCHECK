@@ -31,7 +31,7 @@
         <h2 class="font-bold text-lg text-slate-900">Asset Check</h2>
         <p class="text-xs text-slate-500 mt-0.5">ระบุชื่อผู้ใช้และกดรหัส PIN 4 หลัก (เข้าสู่ระบบอัตโนมัติเมื่อครบ 4 หลัก)</p>
       </div>
-      <form onsubmit="handleLogin(event)" class="space-y-3">
+      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-3">
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">ชื่อผู้ใช้ (Username)</label>
           <input type="text" id="loginUsername" required placeholder="ระบุชื่อผู้ใช้"
@@ -39,13 +39,16 @@
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1.5 text-center">รหัส PIN 4 หลัก (กดจากแป้นตัวเลขเท่านั้น)</label>
+          <div class="flex justify-between items-center mb-1.5">
+            <label class="text-xs font-medium text-slate-600">รหัส PIN 4 หลัก (กดจากแป้นตัวเลขเท่านั้น)</label>
+            <span id="pinCountLabel" class="text-xs font-bold text-blue-600">0 / 4 หลัก</span>
+          </div>
           <input type="hidden" id="loginPin" required>
           <div id="pinDotsDisplay" class="flex justify-center gap-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl select-none">
-            <span class="pin-dot w-3.5 h-3.5 rounded-full bg-slate-300 transition"></span>
-            <span class="pin-dot w-3.5 h-3.5 rounded-full bg-slate-300 transition"></span>
-            <span class="pin-dot w-3.5 h-3.5 rounded-full bg-slate-300 transition"></span>
-            <span class="pin-dot w-3.5 h-3.5 rounded-full bg-slate-300 transition"></span>
+            <span class="pin-dot w-4 h-4 rounded-full bg-slate-300 transition-all"></span>
+            <span class="pin-dot w-4 h-4 rounded-full bg-slate-300 transition-all"></span>
+            <span class="pin-dot w-4 h-4 rounded-full bg-slate-300 transition-all"></span>
+            <span class="pin-dot w-4 h-4 rounded-full bg-slate-300 transition-all"></span>
           </div>
         </div>
 
@@ -547,6 +550,6 @@
     <div id="qrGrid" class="grid grid-cols-3 gap-3"></div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=20261127"></script>
 </body>
 </html>
