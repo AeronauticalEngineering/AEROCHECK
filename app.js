@@ -4,12 +4,14 @@ let allAssets = [];
 let auditedMap = {};
 let html5QrCode = null;
 let isScanning = false;
+let isLoggingIn = false;
 let currentUser = null;
 let compressedImageBase64 = '';
 let tempAvatarBase64 = '';
 let latestStats = { total: 599, audited: 0 };
 
 document.addEventListener('DOMContentLoaded', async () => {
+  updatePinDots();
   const savedSession = localStorage.getItem('asset_user_session');
   if (savedSession) {
     currentUser = JSON.parse(savedSession);
@@ -18,18 +20,57 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+function updatePinDots() {
+  const val = document.getElementById('loginPin').value || '';
+  const dots = document.querySelectorAll('#pinDotsDisplay .pin-dot');
+  dots.forEach((dot, idx) => {
+    if (idx < val.length) {
+      dot.classList.remove('bg-slate-300');
+      dot.classList.add('bg-blue-600', 'scale-110');
+    } else {
+      dot.classList.remove('bg-blue-600', 'scale-110');
+      dot.classList.add('bg-slate-300');
+    }
+  });
+}
+
 function pressPin(digit) {
+  if (isLoggingIn) return;
   const pinInput = document.getElementById('loginPin');
-  if (pinInput.value.length < 4) pinInput.value += digit;
+  if (pinInput.value.length < 4) {
+    pinInput.value += digit;
+    updatePinDots();
+
+    if (pinInput.value.length === 4) {
+      const username = document.getElementById('loginUsername').value.trim();
+      if (!username) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'ยังไม่ได้ระบุชื่อผู้ใช้',
+          text: 'กรุณากรอกชื่อผู้ใช้ก่อนกดรหัส PIN',
+          timer: 1400,
+          showConfirmButton: false
+        });
+        clearPin();
+        return;
+      }
+      isLoggingIn = true;
+      document.querySelector('#loginModal form').requestSubmit();
+    }
+  }
 }
 
 function backspacePin() {
+  if (isLoggingIn) return;
   const pinInput = document.getElementById('loginPin');
   pinInput.value = pinInput.value.slice(0, -1);
+  updatePinDots();
 }
 
 function clearPin() {
+  if (isLoggingIn) return;
   document.getElementById('loginPin').value = '';
+  updatePinDots();
 }
 
 async function initData() {
@@ -49,7 +90,8 @@ async function handleLogin(e) {
   const pin = document.getElementById('loginPin').value.replace(/\D/g, '');
 
   if (!/^\d{4}$/.test(pin)) {
-    Swal.fire({ icon: 'warning', title: 'รหัส PIN ไม่ถูกต้อง', text: 'กรุณากรอกตัวเลข 4 หลักเท่านั้น', timer: 1400, showConfirmButton: false });
+    isLoggingIn = false;
+    Swal.fire({ icon: 'warning', title: 'รหัส PIN ไม่ถูกต้อง', text: 'กรุณากดตัวเลข 4 หลักเท่านั้น', timer: 1400, showConfirmButton: false });
     return;
   }
 
@@ -76,6 +118,7 @@ async function handleLogin(e) {
       };
       localStorage.setItem('asset_user_session', JSON.stringify(currentUser));
 
+      isLoggingIn = false;
       applyRolePermissions();
       Swal.fire({
         icon: 'success',
@@ -87,9 +130,13 @@ async function handleLogin(e) {
       });
       initData();
     } else {
+      isLoggingIn = false;
+      clearPin();
       Swal.fire('เข้าสู่ระบบไม่สำเร็จ', json.message, 'error');
     }
   } catch (err) {
+    isLoggingIn = false;
+    clearPin();
     Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
   }
 }
@@ -160,7 +207,6 @@ function toggleEditProfile() {
 
   const roleSelect = document.getElementById('profInputRole');
   roleSelect.value = currentUser.role || 'user';
-  // ให้ Admin เป็นผู้แก้ไขสิทธิ์ได้เท่านั้น
   roleSelect.disabled = currentUser.role !== 'admin';
 }
 
@@ -245,9 +291,11 @@ function logout() {
   stopScannerSilently();
   localStorage.removeItem('asset_user_session');
   currentUser = null;
+  isLoggingIn = false;
   document.getElementById('appContainer').classList.add('hidden');
   document.getElementById('loginModal').classList.remove('hidden');
   document.getElementById('loginPin').value = '';
+  updatePinDots();
 }
 
 function switchScreen(screenName) {
@@ -335,7 +383,6 @@ function updateSummaryCards() {
   document.getElementById('homePending').innerText = pending;
 }
 
-// เปิดกล้องหลัง พร้อมกรอบสแกนสี่เหลี่ยมตรงกลาง และแสดงกล่องแจ้งเตือนหากเปิดไม่ได้แทนจอดำ
 async function openScannerScreen() {
   switchScreen('scanner');
   document.getElementById('cameraErrorBox').classList.add('hidden');
@@ -426,7 +473,6 @@ async function stopScannerSilently() {
     } catch (_) {}
   }
 
-  // บังคับหยุด MediaStream ทุกตัวที่ค้างอยู่บน video element
   const readerEl = document.getElementById('reader');
   if (readerEl) {
     readerEl.querySelectorAll('video').forEach(vid => {
@@ -439,7 +485,6 @@ async function stopScannerSilently() {
   }
 }
 
-// ปุ่มย้อนกลับและปุ่มปิดต้องหยุดกล้องก่อนกลับหน้าหลักเสมอ
 async function closeScannerScreen() {
   document.getElementById('screen-scanner').classList.add('hidden');
   switchScreen('home');
