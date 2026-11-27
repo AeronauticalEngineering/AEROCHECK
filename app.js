@@ -27,7 +27,6 @@ async function initData() {
   }
 }
 
-// ระบบ Login ตรวจสอบสิทธิ์จากแท็บ Users
 async function handleLogin(e) {
   e.preventDefault();
   const username = document.getElementById('loginUsername').value.trim();
@@ -57,7 +56,6 @@ async function handleLogin(e) {
   }
 }
 
-// จัดการการแสดงผลเมนูตาม Role (admin, user, exec)
 function applyRolePermissions() {
   document.getElementById('loginModal').classList.add('hidden');
   document.getElementById('bottomNav').classList.remove('hidden');
@@ -114,7 +112,6 @@ function switchTab(tab) {
   document.getElementById(`nav-${tab}`).classList.replace('text-slate-500', 'text-orange-600');
 }
 
-// ดึงข้อมูลทะเบียนครุภัณฑ์หลัก
 async function fetchAssets() {
   try {
     const res = await fetch(`${API_URL}?action=getAssets`);
@@ -128,7 +125,6 @@ async function fetchAssets() {
   }
 }
 
-// ดึงรายงานการตรวจนับประจำปี
 async function loadAuditStatus() {
   const year = document.getElementById('auditYear').value;
   try {
@@ -144,7 +140,6 @@ async function loadAuditStatus() {
   }
 }
 
-// กล้องสแกน QR Code
 function toggleScanner() {
   const readerDiv = document.getElementById('reader');
   const btn = document.getElementById('btnToggleCam');
@@ -222,7 +217,6 @@ function closeAuditForm() {
   document.getElementById('auditFormCard').classList.add('hidden');
 }
 
-// บีบอัดภาพก่อนส่งเข้า Google Drive
 function previewImage(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -287,11 +281,10 @@ async function submitAuditForm(e) {
   }
 }
 
-// Dashboard & รายงานผู้บริหาร
 function updateDashboardStats(total, audited) {
   const pending = Math.max(0, total - audited);
   const percent = total > 0 ? ((audited / total) * 100).toFixed(1) : 0;
-  
+
   const activeAssets = allAssets.filter(a => a.status !== 'จำหน่าย');
   const totalValue = activeAssets.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
 
@@ -331,17 +324,21 @@ function renderReportTable() {
     if (filter === 'PENDING' && isAudited) return;
     if (filter === 'DAMAGED' && (!isAudited || log.status === 'ใช้งานได้')) return;
 
-    const searchStr = `${asset.assetCode} ${asset.assetName} ${asset.holder} ${asset.location}`.toLowerCase();
+    const holderDisplay = isAudited ? log.holder : (asset.holder || asset.note || '-');
+    const locationDisplay = isAudited ? log.location : (asset.location || '-');
+    const imageDisplay = isAudited ? log.imageUrl : asset.imageUrl;
+
+    const searchStr = `${asset.assetCode} ${asset.assetName} ${holderDisplay} ${locationDisplay}`.toLowerCase();
     if (keyword && !searchStr.includes(keyword)) return;
 
-    let badge = `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-xs">ยังไม่ตรวจ</span>`;
+    let badge = `<span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs">ยังไม่ตรวจ (ตั้งต้น: ${asset.status || '-'})</span>`;
     if (isAudited) {
       const color = log.status === 'ใช้งานได้' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700';
       badge = `<span class="${color} px-2 py-0.5 rounded-full text-xs font-medium">${log.status}</span>`;
     }
 
-    const imgBtn = (isAudited && log.imageUrl) 
-      ? `<a href="${log.imageUrl}" target="_blank" class="text-blue-600 underline text-xs">ดูรูป</a>` 
+    const imgBtn = imageDisplay
+      ? `<a href="${imageDisplay}" target="_blank" class="text-blue-600 underline text-xs">${isAudited ? 'รูปตรวจปีนี้' : 'รูปตั้งต้น'}</a>`
       : '-';
 
     tbody.innerHTML += `
@@ -349,8 +346,8 @@ function renderReportTable() {
         <td class="p-2.5 font-mono text-xs">${asset.assetCode}</td>
         <td class="p-2.5">${asset.assetName}</td>
         <td class="p-2.5">${Number(asset.price).toLocaleString()}</td>
-        <td class="p-2.5">${isAudited ? log.holder : (asset.holder || asset.note)}</td>
-        <td class="p-2.5">${isAudited ? log.location : asset.location}</td>
+        <td class="p-2.5">${holderDisplay}</td>
+        <td class="p-2.5">${locationDisplay}</td>
         <td class="p-2.5">${badge}</td>
         <td class="p-2.5">${imgBtn}</td>
       </tr>
@@ -385,7 +382,6 @@ function exportReportCSV() {
   link.click();
 }
 
-// ส่วน Admin จัดการครุภัณฑ์ และพิมพ์ QR Code
 function renderAdminTable() {
   const keyword = document.getElementById('searchAdmin').value.toLowerCase();
   const tbody = document.getElementById('adminTableBody');
@@ -395,7 +391,7 @@ function renderAdminTable() {
     const searchStr = `${asset.assetCode} ${asset.assetName} ${asset.status}`.toLowerCase();
     if (keyword && !searchStr.includes(keyword)) return;
 
-    const statusBadge = asset.status === 'จำหน่าย' 
+    const statusBadge = asset.status === 'จำหน่าย'
       ? `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">จำหน่าย</span>`
       : `<span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full text-xs">${asset.status}</span>`;
 
@@ -479,7 +475,6 @@ async function saveAdminAsset(e) {
   }
 }
 
-// พิมพ์สติกเกอร์ QR Code
 function toggleSelectAllQR(master) {
   document.querySelectorAll('.qr-checkbox').forEach(cb => cb.checked = master.checked);
 }
