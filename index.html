@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบตรวจครุภัณฑ์ประจำปี</title>
+  <title>Asset Check - ระบบตรวจครุภัณฑ์ประจำปี</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -11,7 +11,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Prompt', sans-serif; background-color: #f1f5f9; }
+    body { font-family: 'Prompt', sans-serif; background-color: #f4f7fb; }
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
@@ -19,11 +19,11 @@
     }
   </style>
 </head>
-<body class="text-slate-800 pb-24">
+<body class="text-slate-800">
 
-  <!-- Login Modal -->
-  <div id="loginModal" class="fixed inset-0 bg-slate-900/95 flex items-center justify-center z-50 p-4 no-print overflow-y-auto">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 my-auto">
+  <!-- หน้า Login แบบพื้นหลังทึบเต็มจอ (แก้ปัญหาพื้นหลังโผล่เวลากดออก) -->
+  <div id="loginModal" class="fixed inset-0 bg-slate-950 flex items-center justify-center z-50 p-4 no-print overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 my-auto">
       <div class="text-center mb-4">
         <div class="w-14 h-14 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
           <i class="bi bi-qr-code-scan text-3xl"></i>
@@ -35,284 +35,388 @@
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">ชื่อผู้ใช้ (Username)</label>
           <input type="text" id="loginUsername" required placeholder="ระบุชื่อผู้ใช้"
-            class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-orange-500">
+            class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
         </div>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">รหัส PIN (ตัวเลข 4 หลักเท่านั้น)</label>
           <input type="password" id="loginPin" required inputmode="numeric" pattern="\d{4}" maxlength="4"
             oninput="this.value = this.value.replace(/\D/g, '').slice(0, 4)"
             placeholder="••••"
-            class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-center tracking-[0.5em] font-bold text-lg focus:outline-none focus:border-orange-500">
+            class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-center tracking-[0.5em] font-bold text-lg focus:outline-none focus:border-blue-600">
         </div>
 
-        <!-- แป้นตัวเลข 0-9 สำหรับกด PIN 4 หลัก -->
         <div class="grid grid-cols-3 gap-2 pt-1">
-          <button type="button" onclick="pressPin('1')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">1</button>
-          <button type="button" onclick="pressPin('2')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">2</button>
-          <button type="button" onclick="pressPin('3')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">3</button>
-          <button type="button" onclick="pressPin('4')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">4</button>
-          <button type="button" onclick="pressPin('5')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">5</button>
-          <button type="button" onclick="pressPin('6')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">6</button>
-          <button type="button" onclick="pressPin('7')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">7</button>
-          <button type="button" onclick="pressPin('8')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">8</button>
-          <button type="button" onclick="pressPin('9')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">9</button>
-          <button type="button" onclick="clearPin()" class="bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 rounded-xl text-xs transition">ล้าง</button>
-          <button type="button" onclick="pressPin('0')" class="bg-slate-100 hover:bg-slate-200 active:bg-orange-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">0</button>
-          <button type="button" onclick="backspacePin()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl text-base transition"><i class="bi bi-backspace"></i></button>
+          <button type="button" onclick="pressPin('1')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">1</button>
+          <button type="button" onclick="pressPin('2')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">2</button>
+          <button type="button" onclick="pressPin('3')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">3</button>
+          <button type="button" onclick="pressPin('4')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">4</button>
+          <button type="button" onclick="pressPin('5')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">5</button>
+          <button type="button" onclick="pressPin('6')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">6</button>
+          <button type="button" onclick="pressPin('7')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">7</button>
+          <button type="button" onclick="pressPin('8')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">8</button>
+          <button type="button" onclick="pressPin('9')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">9</button>
+          <button type="button" onclick="clearPin()" class="bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 rounded-xl text-xs">ล้าง</button>
+          <button type="button" onclick="pressPin('0')" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-base">0</button>
+          <button type="button" onclick="backspacePin()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl text-base"><i class="bi bi-backspace"></i></button>
         </div>
 
-        <button type="submit" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl shadow transition mt-2">
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl shadow transition mt-2">
           เข้าสู่ระบบ
         </button>
       </form>
     </div>
   </div>
 
-  <!-- Top Navbar -->
-  <nav class="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-40 no-print">
-    <div class="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-2">
-      <div class="flex items-center gap-2.5">
-        <i class="bi bi-qr-code-scan text-orange-400 text-2xl"></i>
-        <div>
-          <h1 class="font-bold text-base md:text-lg leading-tight">ระบบตรวจครุภัณฑ์ประจำปี</h1>
-          <p class="text-xs text-slate-400" id="userBadge">กำลังโหลดข้อมูล...</p>
+  <!-- Container หลักของแอป (ซ่อนทั้งหมดเมื่อยังไม่ได้ Login หรือกดออก) -->
+  <div id="appContainer" class="hidden min-h-screen flex flex-col lg:flex-row no-print">
+
+    <!-- Sidebar สำหรับ Admin (อิงตามภาพที่ 3) -->
+    <aside id="adminSidebar" class="hidden w-full lg:w-64 bg-[#0b1736] text-slate-300 flex-shrink-0 flex-col justify-between">
+      <div>
+        <div class="p-5 border-b border-slate-800">
+          <div class="font-bold text-white tracking-wider text-sm">ASSET CHECK</div>
+          <div class="text-[10px] tracking-widest text-slate-400 mt-0.5">MANAGEMENT</div>
         </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <label class="text-xs text-slate-300 hidden sm:inline">ปีที่ตรวจ:</label>
-        <select id="auditYear" onchange="loadAuditStatus()" class="bg-slate-800 text-orange-400 font-semibold text-sm rounded-lg px-2.5 py-1.5 border border-slate-700">
-          <option value="2569">2569</option>
-          <option value="2570">2570</option>
-          <option value="2571">2571</option>
-        </select>
-        <button onclick="logout()" title="ออกจากระบบ" class="bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1">
-          <i class="bi bi-box-arrow-right"></i> ออก
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <!-- Main Content -->
-  <main class="max-w-6xl mx-auto p-4 no-print">
-
-    <!-- Tab 1: Scan & Audit -->
-    <section id="tab-scan" class="hidden space-y-4">
-      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-        <div class="flex justify-between items-center mb-3">
-          <h2 class="font-semibold text-slate-800"><i class="bi bi-camera text-orange-500 mr-1"></i> สแกน QR Code ครุภัณฑ์</h2>
-          <button id="btnToggleCam" onclick="toggleScanner()" class="bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-1.5 rounded-xl font-medium transition">
-            <i class="bi bi-camera-video"></i> เปิดกล้องสแกน
+        <nav class="p-3 space-y-1 text-sm">
+          <button onclick="switchAdminView('dashboard')" id="adm-nav-dashboard" class="adm-nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-blue-600 text-white font-medium">
+            <i class="bi bi-grid"></i> Dashboard
           </button>
-        </div>
-
-        <div id="reader" class="w-full max-w-md mx-auto rounded-xl overflow-hidden hidden mb-3 border-2 border-orange-400"></div>
-
-        <div class="flex gap-2">
-          <input type="text" id="manualCodeInput" placeholder="หรือพิมพ์รหัสครุภัณฑ์ เช่น 7440-001-8710-6110"
-            class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-500">
-          <button onclick="searchAssetManual()" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-700">
-            ค้นหา
+          <button onclick="switchAdminView('assets')" id="adm-nav-assets" class="adm-nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800/70 transition">
+            <i class="bi bi-box-seam"></i> ทะเบียนครุภัณฑ์
           </button>
-        </div>
+          <button onclick="switchAdminView('cycles')" id="adm-nav-cycles" class="adm-nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800/70 transition">
+            <i class="bi bi-calendar-check"></i> รอบการตรวจ
+          </button>
+          <button onclick="switchAdminView('results')" id="adm-nav-results" class="adm-nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800/70 transition">
+            <i class="bi bi-clipboard-check"></i> ผลการตรวจ
+          </button>
+          <button onclick="switchAdminView('locations')" id="adm-nav-locations" class="adm-nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800/70 transition">
+            <i class="bi bi-geo-alt"></i> สถานที่
+          </button>
+          <button onclick="switchAdminView('holders')" id="adm-nav-holders" class="adm-nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800/70 transition">
+            <i class="bi bi-people"></i> ผู้ถือครอง
+          </button>
+          <button onclick="switchAdminView('qrcode')" id="adm-nav-qrcode" class="adm-nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800/70 transition">
+            <i class="bi bi-qr-code"></i> QR Code
+          </button>
+          <button onclick="switchAdminView('report')" id="adm-nav-report" class="adm-nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-800/70 transition">
+            <i class="bi bi-file-earmark-bar-graph"></i> รายงาน
+          </button>
+        </nav>
       </div>
+      <div class="p-4 border-t border-slate-800 text-xs">
+        <div class="text-white font-medium truncate" id="sidebarUserName"></div>
+        <div class="text-slate-400 mt-0.5">สิทธิ์: Admin</div>
+      </div>
+    </aside>
 
-      <!-- ฟอร์มบันทึกผลการตรวจ -->
-      <div id="auditFormCard" class="bg-white rounded-2xl p-5 shadow-md border-t-4 border-orange-500 hidden">
-        <div class="flex justify-between items-start mb-3">
+    <!-- พื้นที่ทำงานหลัก -->
+    <div class="flex-1 flex flex-col min-w-0">
+      <!-- Top Bar -->
+      <header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap justify-between items-center gap-2 sticky top-0 z-30">
+        <div class="flex items-center gap-2.5">
+          <i class="bi bi-qr-code-scan text-blue-600 text-xl"></i>
           <div>
-            <span id="badgeAudited" class="hidden inline-block bg-emerald-100 text-emerald-700 text-xs font-semibold px-2.5 py-0.5 rounded-full mb-1">
-              <i class="bi bi-check-circle-fill"></i> ตรวจแล้วในปีนี้
-            </span>
-            <p class="text-xs text-slate-500 font-mono" id="dispCode"></p>
-            <h3 class="font-bold text-lg text-slate-900" id="dispName"></h3>
-            <p class="text-xs text-slate-500 mt-0.5" id="dispCategory"></p>
+            <span class="font-bold text-slate-900">Asset Check</span>
+            <span class="text-xs text-slate-500 ml-2" id="topUserInfo"></span>
           </div>
-          <button onclick="closeAuditForm()" class="text-slate-400 hover:text-slate-600 text-xl"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="auditYear" onchange="loadAuditStatus()" class="bg-slate-100 text-blue-700 font-semibold text-xs sm:text-sm rounded-xl px-3 py-1.5 border border-slate-200">
+            <option value="2570">ปี 2570</option>
+            <option value="2569">ปี 2569</option>
+            <option value="2568">ปี 2568</option>
+          </select>
+          <button onclick="logout()" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white text-xs font-medium px-3 py-1.5 rounded-xl transition flex items-center gap-1">
+            <i class="bi bi-box-arrow-right"></i> ออก
+          </button>
+        </div>
+      </header>
+
+      <!-- มุมมองสแกนและตรวจครุภัณฑ์ 2 คอลัมน์ (อิงตามภาพที่ 2) -->
+      <section id="view-audit-2col" class="p-4 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        <!-- คอลัมน์ซ้าย: สรุปความคืบหน้า + สแกน QR + ตรวจสอบล่าสุด -->
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-[#eef4fc] rounded-3xl p-5 border border-blue-100">
+            <div class="text-xs text-slate-500">รอบตรวจประจำปี</div>
+            <div class="text-3xl font-bold text-blue-600 mt-0.5" id="cardCycleYear">2570</div>
+            <div class="text-sm font-medium text-slate-700 mt-3">ความคืบหน้าการตรวจ</div>
+            <div class="text-3xl font-bold text-slate-900 mt-0.5" id="cardProgressPercent">0%</div>
+            <div class="w-full bg-blue-200/70 h-2.5 rounded-full overflow-hidden mt-2.5">
+              <div id="cardProgressBar" class="bg-blue-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="text-xs text-slate-500 mt-2" id="cardProgressRatio">0 / 0 รายการ</div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
+              <div class="text-2xl font-bold text-emerald-600" id="miniNormal">0</div>
+              <div class="text-xs text-slate-500 mt-0.5">ปกติ</div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
+              <div class="text-2xl font-bold text-orange-500" id="miniDamaged">0</div>
+              <div class="text-xs text-slate-500 mt-0.5">ชำรุด</div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
+              <div class="text-2xl font-bold text-red-600" id="miniLost">0</div>
+              <div class="text-xs text-slate-500 mt-0.5">ไม่พบ</div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
+              <div class="text-2xl font-bold text-slate-700" id="miniPending">0</div>
+              <div class="text-xs text-slate-500 mt-0.5">รอตรวจ</div>
+            </div>
+          </div>
+
+          <button id="btnToggleCam" onclick="toggleScanner()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-2xl shadow-md transition flex flex-col items-center justify-center gap-1">
+            <i class="bi bi-qr-code-scan text-2xl"></i>
+            <span class="text-sm">สแกน QR Code</span>
+          </button>
+
+          <div id="reader" class="w-full rounded-2xl overflow-hidden hidden border-2 border-blue-500 bg-black"></div>
+
+          <div class="flex gap-2">
+            <input type="text" id="manualCodeInput" placeholder="พิมพ์รหัสครุภัณฑ์เพื่อค้นหา..."
+              class="flex-1 bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
+            <button onclick="searchAssetManual()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-medium">
+              ค้นหา
+            </button>
+          </div>
+
+          <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
+            <div class="text-xs font-semibold text-slate-500 mb-2.5">ตรวจสอบล่าสุด</div>
+            <div id="recentAuditedList" class="space-y-2.5 text-sm">
+              <div class="text-xs text-slate-400">ยังไม่มีรายการที่ตรวจในปีนี้</div>
+            </div>
+          </div>
         </div>
 
-        <form id="auditForm" onsubmit="submitAuditForm(event)" class="space-y-3 mt-4 border-t pt-4">
-          <input type="hidden" id="formAssetCode">
-          <input type="hidden" id="formAssetName">
+        <!-- คอลัมน์ขวา: การ์ดแสดงครุภัณฑ์ + ฟอร์มบันทึกผลการตรวจ -->
+        <div class="lg:col-span-7 bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
+          <div class="flex items-center gap-2 font-bold text-slate-900 text-base pb-3 border-b border-slate-100">
+            <i class="bi bi-chevron-left text-sm"></i> ตรวจครุภัณฑ์
+          </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="mt-4 bg-slate-100 rounded-2xl h-52 flex items-center justify-center overflow-hidden border border-slate-200/70">
+            <img id="dispAssetImage" src="" alt="รูปครุภัณฑ์" class="max-h-full max-w-full object-contain hidden">
+            <div id="dispAssetPlaceholder" class="text-center text-slate-400">
+              <i class="bi bi-pc-display text-5xl"></i>
+              <p class="text-xs mt-1">สแกน QR Code หรือเลือกรายการครุภัณฑ์</p>
+            </div>
+          </div>
+
+          <div class="mt-4 pb-3 border-b border-slate-100">
+            <h3 class="font-bold text-lg text-slate-900" id="dispName">กรุณาเลือกรายการครุภัณฑ์</h3>
+            <p class="text-xs text-slate-500 font-mono mt-0.5" id="dispCode">รหัส -</p>
+            <span id="badgeFound" class="hidden inline-block mt-2 bg-emerald-100 text-emerald-700 text-xs font-semibold px-3 py-1 rounded-full">
+              พบข้อมูลครุภัณฑ์
+            </span>
+          </div>
+
+          <form id="auditForm" onsubmit="submitAuditForm(event)" class="space-y-3.5 mt-4">
+            <input type="hidden" id="formAssetCode">
+            <input type="hidden" id="formAssetName">
+            <input type="hidden" id="formInspector">
+
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">สถานะครุภัณฑ์ *</label>
-              <select id="formStatus" required class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white">
-                <option value="ใช้งานได้">✅ ใช้งานได้ (ปกติ)</option>
-                <option value="ชำรุด">⚠️ ชำรุด (รอซ่อม)</option>
-                <option value="เสื่อมสภาพ/รอจำหน่าย">🟠 เสื่อมสภาพ / รอจำหน่าย</option>
-                <option value="สูญหาย">❌ สูญหาย / หาไม่พบ</option>
+              <label class="block text-xs font-medium text-slate-600 mb-1">สถานะปัจจุบัน</label>
+              <select id="formStatus" required class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white">
+                <option value="ใช้งานได้">ใช้งานได้ปกติ</option>
+                <option value="ชำรุด">ชำรุด</option>
+                <option value="เสื่อมสภาพ/รอจำหน่าย">เสื่อมสภาพ / รอจำหน่าย</option>
+                <option value="สูญหาย">ไม่พบ / สูญหาย</option>
               </select>
             </div>
 
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">ผู้ถือครอง / ผู้รับผิดชอบ *</label>
-              <input type="text" id="formHolder" required placeholder="ระบุชื่อผู้ถือครอง" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm">
+              <label class="block text-xs font-medium text-slate-600 mb-1">ผู้ถือครอง</label>
+              <input type="text" id="formHolder" required placeholder="ระบุชื่อผู้ถือครอง" class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm">
             </div>
 
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">ตำแหน่งที่ตั้งปัจจุบัน *</label>
-              <input type="text" id="formLocation" required placeholder="เช่น กปก., ห้องประชุม, อาคาร A" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm">
+              <label class="block text-xs font-medium text-slate-600 mb-1">สถานที่ตั้ง</label>
+              <input type="text" id="formLocation" required placeholder="เช่น อาคาร 1 / ห้อง LAB 101" class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm">
             </div>
 
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">ชื่อผู้ตรวจนับ *</label>
-              <input type="text" id="formInspector" required readonly class="w-full border border-slate-200 bg-slate-100 text-slate-600 rounded-xl px-3 py-2 text-sm">
+              <label class="block text-xs font-medium text-slate-600 mb-1">หมายเหตุเพิ่มเติม</label>
+              <input type="text" id="formNote" placeholder="ระบุรายละเอียดเพิ่มเติม (ถ้ามี)" class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">ถ่ายรูป / เพิ่มรูปภาพ</label>
+              <label class="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-xl p-3 cursor-pointer hover:bg-slate-50 transition">
+                <i class="bi bi-camera text-xl text-slate-500"></i>
+                <span class="text-xs text-slate-600 mt-1">ถ่ายรูป / เพิ่มรูปภาพ</span>
+                <input type="file" id="formImage" accept="image/*" capture="environment" onchange="previewImage(event)" class="hidden">
+              </label>
+              <img id="imagePreview" class="mt-2 max-h-36 rounded-xl hidden border mx-auto">
+            </div>
+
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl shadow transition">
+              บันทึกผลการตรวจ
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- มุมมอง Admin / ผู้บริหาร (อิงตามภาพที่ 3 และ 4) -->
+      <section id="view-admin-panel" class="hidden p-4 lg:p-6 max-w-7xl w-full mx-auto space-y-5">
+
+        <!-- Sub-view 1: Inspection Dashboard (ภาพที่ 3) -->
+        <div id="adm-sub-dashboard" class="space-y-5">
+          <div class="flex justify-between items-center">
+            <h2 class="text-xl font-bold text-slate-900">Inspection Dashboard</h2>
+            <span class="bg-white border border-slate-200 px-3 py-1 rounded-xl text-xs font-semibold text-slate-700" id="dashYearBadge">ปี 2570</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+              <div class="text-xs text-slate-500">ต้องตรวจทั้งหมด</div>
+              <div class="text-3xl font-bold text-blue-600 mt-1" id="dashTotal">0</div>
+            </div>
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+              <div class="text-xs text-slate-500">ตรวจแล้ว</div>
+              <div class="text-3xl font-bold text-emerald-600 mt-1" id="dashAudited">0</div>
+            </div>
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+              <div class="text-xs text-slate-500">ยังไม่ตรวจ</div>
+              <div class="text-3xl font-bold text-slate-700 mt-1" id="dashPending">0</div>
+            </div>
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
+              <div class="text-xs text-slate-500">พบปัญหา</div>
+              <div class="text-3xl font-bold text-orange-500 mt-1" id="dashIssue">0</div>
             </div>
           </div>
 
+          <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm">
+            <div class="font-bold text-slate-900 mb-4">ความคืบหน้าการตรวจประจำปี</div>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-8 py-2">
+              <div id="donutChart" class="w-44 h-44 rounded-full flex items-center justify-center relative" style="background: conic-gradient(#16a34a 0% 0%, #e2e8f0 0% 100%);">
+                <div class="w-32 h-32 bg-white rounded-full flex flex-col items-center justify-center shadow-inner">
+                  <span class="text-2xl font-bold text-slate-900" id="donutPercent">0%</span>
+                  <span class="text-xs text-slate-400">Completed</span>
+                </div>
+              </div>
+              <div class="space-y-2.5 text-sm">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-3 h-3 rounded-full bg-emerald-600 inline-block"></span>
+                  <span class="text-slate-700">ตรวจแล้ว <strong id="donutAuditedText">0</strong></span>
+                </div>
+                <div class="flex items-center gap-2.5">
+                  <span class="w-3 h-3 rounded-full bg-slate-200 inline-block"></span>
+                  <span class="text-slate-700">รอตรวจ <strong id="donutPendingText">0</strong></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm">
+            <div class="font-bold text-slate-900 mb-4">ความคืบหน้าแยกตามสถานที่</div>
+            <div id="locationProgressList" class="space-y-4"></div>
+          </div>
+        </div>
+
+        <!-- Sub-view 2: ระบบจัดการรอบตรวจประจำปี (ภาพที่ 4) -->
+        <div id="adm-sub-cycles" class="hidden space-y-4">
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">หมายเหตุเพิ่มเติม</label>
-            <input type="text" id="formNote" placeholder="ระบุรายละเอียดเพิ่มเติม (ถ้ามี)" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm">
+            <h2 class="text-xl font-bold text-slate-900">ระบบจัดการรอบตรวจประจำปี</h2>
+            <p class="text-xs text-slate-500 mt-0.5">จัดการรอบการตรวจนับครุภัณฑ์ย้อนหลังและปีปัจจุบัน</p>
           </div>
 
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">ถ่ายภาพปัจจุบัน (ถ้ามี)</label>
-            <input type="file" id="formImage" accept="image/*" capture="environment" onchange="previewImage(event)"
-              class="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100">
-            <img id="imagePreview" class="mt-2 max-h-40 rounded-xl hidden border">
-          </div>
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm divide-y divide-slate-100">
+            <div class="p-5 flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-11 h-11 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center text-xl">
+                  <i class="bi bi-calendar3"></i>
+                </div>
+                <div>
+                  <div class="font-bold text-slate-900">ปีงบประมาณ 2568</div>
+                  <div class="text-xs text-slate-500">ตรวจสอบข้อมูลย้อนหลังใน Audit_Logs</div>
+                </div>
+              </div>
+              <span class="bg-slate-100 text-slate-600 text-xs font-semibold px-3.5 py-1.5 rounded-full">ปิดรอบแล้ว</span>
+            </div>
 
-          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl shadow transition flex justify-center items-center gap-2">
-            <i class="bi bi-check2-circle text-lg"></i> ยืนยันการตรวจครุภัณฑ์
-          </button>
-        </form>
-      </div>
-    </section>
+            <div class="p-5 flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-11 h-11 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center text-xl">
+                  <i class="bi bi-calendar3"></i>
+                </div>
+                <div>
+                  <div class="font-bold text-slate-900">ปีงบประมาณ 2569</div>
+                  <div class="text-xs text-slate-500">ตรวจสอบข้อมูลย้อนหลังใน Audit_Logs</div>
+                </div>
+              </div>
+              <span class="bg-slate-100 text-slate-600 text-xs font-semibold px-3.5 py-1.5 rounded-full">ปิดรอบแล้ว</span>
+            </div>
 
-    <!-- Tab 2: Executive Dashboard & Report -->
-    <section id="tab-report" class="hidden space-y-4">
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-xs text-slate-500">ครุภัณฑ์ในบัญชี (ชิ้น)</p>
-          <p class="text-2xl font-bold text-slate-800 mt-1" id="statTotal">0</p>
-        </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-xs text-slate-500">ตรวจแล้วในปีนี้ (ชิ้น)</p>
-          <p class="text-2xl font-bold text-emerald-600 mt-1" id="statAudited">0</p>
-        </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-xs text-slate-500">ยังไม่ตรวจ (ชิ้น)</p>
-          <p class="text-2xl font-bold text-orange-500 mt-1" id="statPending">0</p>
-        </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-xs text-slate-500">ความคืบหน้า</p>
-          <p class="text-2xl font-bold text-blue-600 mt-1" id="statPercent">0%</p>
-        </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm col-span-2 md:col-span-1">
-          <p class="text-xs text-slate-500">มูลค่ารวมครุภัณฑ์ (บาท)</p>
-          <p class="text-xl font-bold text-slate-900 mt-1" id="statTotalValue">0</p>
-        </div>
-      </div>
+            <div class="p-5 flex flex-col gap-2.5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                  <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                    <i class="bi bi-calendar-check"></i>
+                  </div>
+                  <div>
+                    <div class="font-bold text-slate-900">ปีงบประมาณ 2570</div>
+                    <div class="text-xs text-slate-500" id="cycle2570Summary">กำลังคำนวณความคืบหน้า...</div>
+                  </div>
+                </div>
+                <span class="bg-emerald-100 text-emerald-700 text-xs font-semibold px-3.5 py-1.5 rounded-full">กำลังตรวจ</span>
+              </div>
+              <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden ml-0 sm:ml-14 sm:w-[calc(100%-3.5rem)]">
+                <div id="cycle2570Bar" class="bg-emerald-600 h-full rounded-full" style="width: 0%"></div>
+              </div>
+            </div>
 
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <h3 class="text-xs font-semibold text-slate-600 mb-3">สรุปผลสภาพครุภัณฑ์ที่ตรวจพบในปีที่เลือก</h3>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-          <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5">
-            <span class="text-xs text-emerald-700">ใช้งานได้ปกติ</span>
-            <p class="text-lg font-bold text-emerald-800" id="countNormal">0</p>
-          </div>
-          <div class="bg-amber-50 border border-amber-200 rounded-xl p-2.5">
-            <span class="text-xs text-amber-700">ชำรุด (รอซ่อม)</span>
-            <p class="text-lg font-bold text-amber-800" id="countDamaged">0</p>
-          </div>
-          <div class="bg-orange-50 border border-orange-200 rounded-xl p-2.5">
-            <span class="text-xs text-orange-700">เสื่อมสภาพ/รอจำหน่าย</span>
-            <p class="text-lg font-bold text-orange-800" id="countDegraded">0</p>
-          </div>
-          <div class="bg-red-50 border border-red-200 rounded-xl p-2.5">
-            <span class="text-xs text-red-700">สูญหาย / หาไม่พบ</span>
-            <p class="text-lg font-bold text-red-800" id="countLost">0</p>
+            <button onclick="openAdminModal('add')" class="w-full p-4 text-center text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-b-3xl transition flex items-center justify-center gap-2">
+              <i class="bi bi-plus-circle text-lg"></i> เพิ่มรายการครุภัณฑ์เข้าสู่รอบตรวจใหม่
+            </button>
           </div>
         </div>
-      </div>
 
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
-          <div class="flex flex-wrap gap-2">
-            <select id="filterReportStatus" onchange="renderReportTable()" class="border border-slate-300 rounded-xl px-3 py-1.5 text-sm">
-              <option value="ALL">แสดงทั้งหมด</option>
-              <option value="AUDITED">ตรวจแล้ว</option>
-              <option value="PENDING">ยังไม่ตรวจ</option>
-              <option value="DAMAGED">ชำรุด / เสื่อมสภาพ / สูญหาย</option>
-            </select>
-            <input type="text" id="searchReport" onkeyup="renderReportTable()" placeholder="ค้นหารหัส/ชื่อ/ผู้ถือครอง/ตำแหน่ง..." class="border border-slate-300 rounded-xl px-3 py-1.5 text-sm">
+        <!-- Sub-view 3: ตารางทะเบียนครุภัณฑ์ / ผลการตรวจ / QR Code / รายงาน -->
+        <div id="adm-sub-table" class="hidden bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+          <div class="flex flex-wrap justify-between items-center gap-3">
+            <div>
+              <h2 class="text-lg font-bold text-slate-900" id="admTableTitle">ทะเบียนครุภัณฑ์</h2>
+              <p class="text-xs text-slate-500" id="admTableSubtitle">จัดการข้อมูลครุภัณฑ์ จำหน่าย และพิมพ์ QR Code</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button onclick="exportReportCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3.5 py-2 rounded-xl">
+                <i class="bi bi-file-earmark-excel"></i> Export CSV
+              </button>
+              <button onclick="printSelectedQRCodes()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2 rounded-xl">
+                <i class="bi bi-printer"></i> พิมพ์ QR ที่เลือก
+              </button>
+              <button onclick="openAdminModal('add')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3.5 py-2 rounded-xl">
+                <i class="bi bi-plus-lg"></i> ลงครุภัณฑ์ใหม่
+              </button>
+            </div>
           </div>
-          <button onclick="exportReportCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-1.5 rounded-xl font-medium">
-            <i class="bi bi-file-earmark-excel"></i> Export รายงาน (CSV)
-          </button>
+
+          <input type="text" id="searchAdmin" onkeyup="renderAdminTable()" placeholder="ค้นหารหัส ชื่อครุภัณฑ์ ผู้ถือครอง หรือสถานที่..."
+            class="w-full md:w-96 border border-slate-300 rounded-xl px-3.5 py-2 text-sm">
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr class="bg-slate-50 text-slate-600 border-b">
+                  <th class="p-2.5 w-8"><input type="checkbox" onclick="toggleSelectAllQR(this)"></th>
+                  <th class="p-2.5">รหัสครุภัณฑ์</th>
+                  <th class="p-2.5">ชื่อครุภัณฑ์</th>
+                  <th class="p-2.5">ผู้ถือครอง / สถานที่</th>
+                  <th class="p-2.5">สถานะตรวจปีนี้</th>
+                  <th class="p-2.5 text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="adminTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr class="bg-slate-100 text-slate-600 border-b">
-                <th class="p-2.5">รหัสครุภัณฑ์</th>
-                <th class="p-2.5">ชื่อครุภัณฑ์</th>
-                <th class="p-2.5">ราคา</th>
-                <th class="p-2.5">ผู้รับผิดชอบ</th>
-                <th class="p-2.5">ตำแหน่ง</th>
-                <th class="p-2.5">สถานะการตรวจ</th>
-                <th class="p-2.5">รูปภาพ</th>
-              </tr>
-            </thead>
-            <tbody id="reportTableBody" class="divide-y divide-slate-100"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- Tab 3: Admin Management -->
-    <section id="tab-admin" class="hidden space-y-4">
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap justify-between items-center gap-3">
-        <div>
-          <h2 class="font-bold text-slate-800">จัดการทะเบียนครุภัณฑ์ (Admin)</h2>
-          <p class="text-xs text-slate-500">ลงของใหม่ แก้ไขข้อมูล จำหน่ายของเดิม หรือพิมพ์สติกเกอร์ QR Code</p>
-        </div>
-        <div class="flex gap-2">
-          <button onclick="printSelectedQRCodes()" class="bg-slate-800 text-white text-sm px-3.5 py-2 rounded-xl hover:bg-slate-700">
-            <i class="bi bi-printer"></i> พิมพ์ QR Code ที่เลือก
-          </button>
-          <button onclick="openAdminModal('add')" class="bg-orange-500 text-white text-sm px-3.5 py-2 rounded-xl hover:bg-orange-600 font-medium">
-            <i class="bi bi-plus-lg"></i> ลงครุภัณฑ์ใหม่
-          </button>
-        </div>
-      </div>
-
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <input type="text" id="searchAdmin" onkeyup="renderAdminTable()" placeholder="ค้นหารหัสหรือชื่อครุภัณฑ์เพื่อแก้ไข / จำหน่าย / พิมพ์ QR..." class="w-full md:w-96 border border-slate-300 rounded-xl px-3 py-2 text-sm mb-3">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr class="bg-slate-100 text-slate-600 border-b">
-                <th class="p-2.5 w-8"><input type="checkbox" onclick="toggleSelectAllQR(this)"></th>
-                <th class="p-2.5">รหัสครุภัณฑ์</th>
-                <th class="p-2.5">ชื่อครุภัณฑ์</th>
-                <th class="p-2.5">ราคา</th>
-                <th class="p-2.5">สถานะบัญชี</th>
-                <th class="p-2.5 text-right">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody id="adminTableBody" class="divide-y divide-slate-100"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- Bottom Navigation Bar -->
-  <nav id="bottomNav" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around py-2 z-40 no-print shadow-lg">
-    <button onclick="switchTab('scan')" id="nav-scan" class="hidden flex-col items-center text-orange-600 font-medium text-xs">
-      <i class="bi bi-qr-code-scan text-xl mb-0.5"></i> สแกนตรวจ
-    </button>
-    <button onclick="switchTab('report')" id="nav-report" class="hidden flex-col items-center text-slate-500 text-xs">
-      <i class="bi bi-bar-chart-line text-xl mb-0.5"></i> Dashboard / รายงาน
-    </button>
-    <button onclick="switchTab('admin')" id="nav-admin" class="hidden flex-col items-center text-slate-500 text-xs">
-      <i class="bi bi-shield-lock text-xl mb-0.5"></i> จัดการข้อมูล (Admin)
-    </button>
-  </nav>
+      </section>
+    </div>
+  </div>
 
   <!-- Modal เพิ่ม/แก้ไข/จำหน่ายครุภัณฑ์ -->
   <div id="adminModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4 no-print">
@@ -331,22 +435,12 @@
           </div>
           <div>
             <label class="block text-xs text-slate-600 mb-1">วันที่ได้มา</label>
-            <input type="text" id="admAcquireDate" placeholder="เช่น 26/09/2569" class="w-full border rounded-xl px-3 py-2">
+            <input type="text" id="admAcquireDate" class="w-full border rounded-xl px-3 py-2">
           </div>
         </div>
         <div>
           <label class="block text-xs text-slate-600 mb-1">ชื่อครุภัณฑ์ *</label>
           <input type="text" id="admName" required class="w-full border rounded-xl px-3 py-2">
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs text-slate-600 mb-1">ประเภทหลัก</label>
-            <input type="text" id="admMainCat" class="w-full border rounded-xl px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-600 mb-1">ประเภทย่อย</label>
-            <input type="text" id="admSubCat" class="w-full border rounded-xl px-3 py-2">
-          </div>
         </div>
         <div class="grid grid-cols-3 gap-3">
           <div>
@@ -358,15 +452,11 @@
             <input type="text" id="admLocation" class="w-full border rounded-xl px-3 py-2">
           </div>
           <div>
-            <label class="block text-xs text-slate-600 mb-1">งบที่ซื้อ</label>
-            <input type="text" id="admBudget" class="w-full border rounded-xl px-3 py-2">
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
             <label class="block text-xs text-slate-600 mb-1">ผู้รับผิดชอบ</label>
             <input type="text" id="admHolder" class="w-full border rounded-xl px-3 py-2">
           </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs text-slate-600 mb-1">สถานะบัญชี</label>
             <select id="admStatus" class="w-full border rounded-xl px-3 py-2 bg-white">
@@ -375,20 +465,20 @@
               <option value="จำหน่าย">จำหน่าย (ตัดออกจากบัญชี)</option>
             </select>
           </div>
-        </div>
-        <div>
-          <label class="block text-xs text-slate-600 mb-1">หมายเหตุ</label>
-          <input type="text" id="admNote" class="w-full border rounded-xl px-3 py-2">
+          <div>
+            <label class="block text-xs text-slate-600 mb-1">หมายเหตุ</label>
+            <input type="text" id="admNote" class="w-full border rounded-xl px-3 py-2">
+          </div>
         </div>
         <div class="pt-2 flex justify-end gap-2">
           <button type="button" onclick="closeAdminModal()" class="px-4 py-2 rounded-xl border">ยกเลิก</button>
-          <button type="submit" class="px-5 py-2 rounded-xl bg-orange-500 text-white font-semibold">บันทึกข้อมูล</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 text-white font-semibold">บันทึกข้อมูล</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- พื้นที่สำหรับพิมพ์สติกเกอร์ QR Code (แสดงชื่อเต็มไม่ตัดคำ) -->
+  <!-- พื้นที่สำหรับพิมพ์สติกเกอร์ QR Code แสดงชื่อเต็มไม่ตัดคำ -->
   <div id="printArea" class="hidden print-only p-3">
     <div id="qrGrid" class="grid grid-cols-3 gap-3"></div>
   </div>
