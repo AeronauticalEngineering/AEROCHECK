@@ -1157,25 +1157,35 @@ function printSelectedQRCodes() {
 
   const grid = document.getElementById('qrGrid');
   grid.innerHTML = '';
-  const baseUrl = window.location.origin + window.location.pathname;
 
   checked.forEach((code, i) => {
     const asset = allAssets.find(a => a.assetCode === code);
+    if (!asset) return;
+
+    const cleanCode = String(asset.assetCode || '').trim();
     const box = document.createElement('div');
-    box.className = 'border border-black p-2.5 flex flex-col items-center text-center break-inside-avoid bg-white';
+    box.className = 'border border-black p-3 flex flex-col items-center text-center break-inside-avoid bg-white';
     box.innerHTML = `
-      <div id="qr-${i}" class="mb-1.5"></div>
-      <div class="font-bold text-xs font-mono text-black">${asset.assetCode}</div>
+      <div id="qr-${i}" class="p-2 bg-white flex items-center justify-center"></div>
+      <div class="font-bold text-xs font-mono text-black mt-1 tracking-wide">${cleanCode}</div>
       <div class="text-[11px] text-black leading-snug break-words whitespace-normal w-full mt-0.5">${asset.assetName}</div>
     `;
     grid.appendChild(box);
 
     new QRCode(document.getElementById(`qr-${i}`), {
-      text: `${baseUrl}?code=${encodeURIComponent(asset.assetCode)}`,
-      width: 92,
-      height: 92
+      text: cleanCode,
+      width: 112,
+      height: 112,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
     });
   });
 
-  setTimeout(() => window.print(), 600);
+  setTimeout(() => {
+    document.querySelectorAll('#qrGrid canvas, #qrGrid img').forEach(el => {
+      el.style.imageRendering = 'pixelated';
+    });
+    window.print();
+  }, 500);
 }
