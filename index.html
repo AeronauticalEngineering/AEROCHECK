@@ -12,6 +12,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Prompt', sans-serif; background-color: #f4f7fb; }
+    /* ซ่อนกรอบสีขาว/เงาเริ่มต้นของ html5-qrcode เพื่อไม่ให้ซ้อนกับกรอบสีฟ้า */
+    #reader__scan_region { border: none !important; }
+    #qr-shaded-region { display: none !important; border: none !important; box-shadow: none !important; }
+    #reader video { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 1.5rem; }
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
@@ -77,7 +81,7 @@
   <!-- Container หลักของแอป -->
   <div id="appContainer" class="hidden min-h-screen flex flex-col pb-24 no-print">
 
-    <!-- Top Bar -->
+    <!-- Top Bar พร้อมปุ่ม Log out สีแดงมุมขวาบน -->
     <header id="mainHeader" class="bg-white border-b border-slate-200/80 px-4 py-3 flex justify-between items-center sticky top-0 z-30">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 rounded-lg border-2 border-blue-600 text-blue-600 flex items-center justify-center font-bold">
@@ -86,11 +90,15 @@
         <span class="font-bold text-slate-900 text-base">Asset Check</span>
       </div>
       <div class="flex items-center gap-2">
-        <select id="auditYear" onchange="loadAuditStatus()" class="bg-blue-50 text-blue-700 font-semibold text-xs rounded-xl px-3 py-1.5 border border-blue-200">
+        <select id="auditYear" onchange="loadAuditStatus()" class="bg-blue-50 text-blue-700 font-semibold text-xs rounded-xl px-2.5 py-1.5 border border-blue-200">
           <option value="2570">ปี 2570</option>
           <option value="2569">ปี 2569</option>
           <option value="2568">ปี 2568</option>
         </select>
+        <button type="button" onclick="logout()" title="ออกจากระบบ" aria-label="ออกจากระบบ"
+          class="w-9 h-9 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white flex items-center justify-center transition shadow-sm border border-red-100">
+          <i class="bi bi-box-arrow-right text-base"></i>
+        </button>
       </div>
     </header>
 
@@ -143,7 +151,7 @@
       </div>
     </section>
 
-    <!-- 02 สแกน QR -->
+    <!-- 02 สแกน QR: กรอบสแกนสีฟ้าเพียงอันเดียว + อ่านไว -->
     <section id="screen-scanner" class="hidden fixed inset-0 bg-slate-950 text-white z-50 flex flex-col justify-between p-4">
       <div class="flex items-center justify-between pt-1">
         <button type="button" onclick="closeScannerScreen()" class="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-lg">
@@ -154,10 +162,12 @@
       </div>
 
       <div class="flex-1 flex flex-col items-center justify-center my-3 relative w-full max-w-sm mx-auto">
-        <div id="cameraViewBox" class="relative w-full aspect-square rounded-3xl overflow-hidden border-2 border-slate-700 bg-black flex items-center justify-center">
+        <div id="cameraViewBox" class="relative w-full aspect-square rounded-3xl overflow-hidden border border-slate-700 bg-black flex items-center justify-center">
           <div id="reader" class="w-full h-full"></div>
+
+          <!-- กรอบสแกนสีฟ้าสี่เหลี่ยมเพียงอันเดียว -->
           <div id="scanFrameOverlay" class="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div class="w-56 h-56 border-2 border-blue-400 rounded-2xl shadow-[0_0_0_9999px_rgba(2,6,23,0.45)] relative">
+            <div class="w-56 h-56 border-2 border-blue-400 rounded-2xl relative">
               <span class="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 border-blue-400 rounded-tl-xl"></span>
               <span class="absolute -top-0.5 -right-0.5 w-6 h-6 border-t-4 border-r-4 border-blue-400 rounded-tr-xl"></span>
               <span class="absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-4 border-l-4 border-blue-400 rounded-bl-xl"></span>
@@ -550,6 +560,6 @@
     <div id="qrGrid" class="grid grid-cols-3 gap-3"></div>
   </div>
 
-  <script src="app.js?v=20261127"></script>
+  <script src="app.js?v=20261128"></script>
 </body>
 </html>
