@@ -10,6 +10,8 @@ let currentUser = null;
 let compressedImageBase64 = '';
 let tempAvatarBase64 = '';
 let latestStats = { total: 599, audited: 0 };
+let execDonutChartInstance = null;
+let execDeptChartInstance = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   updatePinDots();
@@ -161,15 +163,95 @@ function applyRolePermissions() {
   document.getElementById('appContainer').classList.remove('hidden');
   document.getElementById('formInspector').value = currentUser.fullName;
 
-  const btnAdmin = document.getElementById('btnOpenAdminPanel');
-  if (currentUser.role === 'admin' || currentUser.role === 'exec') {
-    btnAdmin.classList.remove('hidden');
-  } else {
-    btnAdmin.classList.add('hidden');
+  const badge = document.getElementById('headerRoleBadge');
+  if (badge) {
+    badge.innerText = currentUser.role === 'admin' ? 'Admin' : (currentUser.role === 'exec' ? 'ผู้บริหาร' : 'User');
   }
 
+  renderBottomNavByRole();
   renderProfileUI();
   switchScreen('home');
+}
+
+function renderBottomNavByRole() {
+  const navContainer = document.getElementById('bottomNavContainer');
+  if (!navContainer || !currentUser) return;
+
+  if (currentUser.role === 'exec') {
+    navContainer.className = 'max-w-md mx-auto grid grid-cols-4 items-center py-1.5 text-[10px] font-medium';
+    navContainer.innerHTML = `
+      <button type="button" onclick="switchScreen('home')" data-nav="home" class="bnav-btn flex flex-col items-center justify-center py-1 text-blue-600">
+        <i class="bi bi-pie-chart-fill text-lg leading-none mb-1"></i>
+        <span>ภาพรวม</span>
+      </button>
+      <button type="button" onclick="switchScreen('exec-analytics')" data-nav="exec-analytics" class="bnav-btn flex flex-col items-center justify-center py-1 text-slate-400">
+        <i class="bi bi-bar-chart-line-fill text-lg leading-none mb-1"></i>
+        <span>วิเคราะห์</span>
+      </button>
+      <button type="button" onclick="switchScreen('exec-reports')" data-nav="exec-reports" class="bnav-btn flex flex-col items-center justify-center py-1 text-slate-400">
+        <i class="bi bi-file-earmark-bar-graph text-lg leading-none mb-1"></i>
+        <span>รายงาน</span>
+      </button>
+      <button type="button" onclick="switchScreen('profile')" data-nav="profile" class="bnav-btn flex flex-col items-center justify-center py-1 text-slate-400">
+        <i class="bi bi-person text-lg leading-none mb-1"></i>
+        <span>โปรไฟล์</span>
+      </button>
+    `;
+    return;
+  }
+
+  if (currentUser.role === 'admin') {
+    navContainer.className = 'max-w-md mx-auto grid grid-cols-5 items-center py-1.5 text-[10px] font-medium';
+    navContainer.innerHTML = `
+      <button type="button" onclick="switchScreen('home')" data-nav="home" class="bnav-btn flex flex-col items-center justify-center py-1 text-blue-600">
+        <i class="bi bi-house-door-fill text-lg leading-none mb-1"></i>
+        <span>หน้าหลัก</span>
+      </button>
+      <button type="button" onclick="switchScreen('list')" data-nav="list" class="bnav-btn flex flex-col items-center justify-center py-1 text-slate-400">
+        <i class="bi bi-box-seam text-lg leading-none mb-1"></i>
+        <span>ทะเบียน</span>
+      </button>
+      <button type="button" onclick="openScannerScreen()" data-nav="scanner" class="flex flex-col items-center justify-center -mt-4">
+        <span class="w-11 h-11 rounded-2xl bg-blue-600 text-white shadow-md flex items-center justify-center text-xl">
+          <i class="bi bi-qr-code-scan"></i>
+        </span>
+      </button>
+      <button type="button" onclick="switchScreen('admin')" data-nav="admin" class="bnav-btn flex flex-col items-center justify-center py-1 text-slate-400">
+        <i class="bi bi-sliders text-lg leading-none mb-1"></i>
+        <span>จัดการ</span>
+      </button>
+      <button type="button" onclick="switchScreen('profile')" data-nav="profile" class="bnav-btn flex flex-col items-center justify-center py-1 text-slate-400">
+        <i class="bi bi-person text-lg leading-none mb-1"></i>
+        <span>โปรไฟล์</span>
+      </button>
+    `;
+    return;
+  }
+
+  navContainer.className = 'max-w-md mx-auto grid grid-cols-5 items-center py-1.5 text-[10px] font-medium';
+  navContainer.innerHTML = `
+    <button type="button" onclick="switchScreen('home')" data-nav="home" class="bnav-btn flex flex-col items-center justify-center py-1 text-blue-600">
+      <i class="bi bi-house-door-fill text-lg leading-none mb-1"></i>
+      <span>หน้าหลัก</span>
+    </button>
+    <button type="button" onclick="switchScreen('list')" data-nav="list" class="bnav-btn flex flex-col items-center justify-center py-1 text-slate-400">
+      <i class="bi bi-list-ul text-lg leading-none mb-1"></i>
+      <span>รายการ</span>
+    </button>
+    <button type="button" onclick="openScannerScreen()" data-nav="scanner" class="flex flex-col items-center justify-center -mt-4">
+      <span class="w-11 h-11 rounded-2xl bg-blue-600 text-white shadow-md flex items-center justify-center text-xl">
+        <i class="bi bi-qr-code-scan"></i>
+      </span>
+    </button>
+    <button type="button" onclick="switchScreen('history')" data-nav="history" class="bnav-btn flex flex-col items-center justify-center py-1 text-slate-400">
+      <i class="bi bi-clock-history text-lg leading-none mb-1"></i>
+      <span>ประวัติ</span>
+    </button>
+    <button type="button" onclick="switchScreen('profile')" data-nav="profile" class="bnav-btn flex flex-col items-center justify-center py-1 text-slate-400">
+      <i class="bi bi-person text-lg leading-none mb-1"></i>
+      <span>โปรไฟล์</span>
+    </button>
+  `;
 }
 
 function renderProfileUI() {
@@ -282,14 +364,7 @@ function saveProfileChanges(e) {
   document.getElementById('profileViewMode').classList.remove('hidden');
   document.getElementById('profAvatarUploadLabel').classList.add('hidden');
 
-  const btnAdmin = document.getElementById('btnOpenAdminPanel');
-  if (currentUser.role === 'admin' || currentUser.role === 'exec') {
-    btnAdmin.classList.remove('hidden');
-  } else {
-    btnAdmin.classList.add('hidden');
-  }
-
-  renderProfileUI();
+  applyRolePermissions();
   Swal.fire({ icon: 'success', title: 'บันทึกการเปลี่ยนแปลงแล้ว', timer: 1200, showConfirmButton: false });
 }
 
@@ -304,34 +379,57 @@ function logout() {
   updatePinDots();
 }
 
+function resolveHomeScreenId() {
+  if (!currentUser) return 'screen-home-user';
+  if (currentUser.role === 'admin') return 'screen-home-admin';
+  if (currentUser.role === 'exec') return 'screen-home-exec';
+  return 'screen-home-user';
+}
+
 function switchScreen(screenName) {
   if (screenName !== 'scanner') {
     stopScannerSilently();
   }
 
-  ['home', 'scanner', 'inspect', 'success', 'list', 'history', 'profile', 'admin'].forEach(s => {
-    const el = document.getElementById(`screen-${s}`);
+  [
+    'screen-home-user',
+    'screen-home-admin',
+    'screen-home-exec',
+    'screen-exec-analytics',
+    'screen-exec-reports',
+    'screen-scanner',
+    'screen-inspect',
+    'screen-success',
+    'screen-list',
+    'screen-history',
+    'screen-profile',
+    'screen-admin'
+  ].forEach(s => {
+    const el = document.getElementById(s);
     if (el) el.classList.add('hidden');
   });
 
   document.querySelectorAll('.bnav-btn').forEach(btn => {
     btn.classList.remove('text-blue-600');
     btn.classList.add('text-slate-400');
+    if (btn.dataset.nav === screenName) {
+      btn.classList.remove('text-slate-400');
+      btn.classList.add('text-blue-600');
+    }
   });
 
-  const activeNav = document.getElementById(`bnav-${screenName}`);
-  if (activeNav) {
-    activeNav.classList.remove('text-slate-400');
-    activeNav.classList.add('text-blue-600');
+  if (screenName === 'home') {
+    document.getElementById(resolveHomeScreenId())?.classList.remove('hidden');
+    updateSummaryCards();
+  } else {
+    document.getElementById(`screen-${screenName}`)?.classList.remove('hidden');
   }
-
-  const target = document.getElementById(`screen-${screenName}`);
-  if (target) target.classList.remove('hidden');
 
   if (screenName === 'list') renderAssetListScreen();
   if (screenName === 'history') renderHistoryScreen();
   if (screenName === 'profile') renderProfileUI();
   if (screenName === 'admin') renderAdminTable();
+  if (screenName === 'exec-analytics') renderExecAnalyticsScreen();
 }
 
 async function fetchAssets() {
@@ -352,6 +450,9 @@ async function fetchAssets() {
 async function loadAuditStatus() {
   const year = document.getElementById('auditYear').value;
   document.getElementById('homeCycleYear').innerText = year;
+  if (document.getElementById('admDashYear')) document.getElementById('admDashYear').innerText = year;
+  if (document.getElementById('execYearLabel')) document.getElementById('execYearLabel').innerText = year;
+
   try {
     const res = await fetch(`${API_URL}?action=getAuditReport&year=${year}`);
     const json = await res.json();
@@ -368,7 +469,8 @@ async function loadAuditStatus() {
 }
 
 function updateSummaryCards() {
-  const total = latestStats.total || 0;
+  const activeAssets = allAssets.filter(a => a.status !== 'จำหน่าย');
+  const total = latestStats.total || activeAssets.length || 599;
   const audited = latestStats.audited || 0;
   const pending = Math.max(0, total - audited);
   const percent = total > 0 ? Number(((audited / total) * 100).toFixed(1)) : 0;
@@ -380,6 +482,7 @@ function updateSummaryCards() {
     else if (log.status === 'สูญหาย') lost++;
   });
 
+  // User Home
   document.getElementById('homeProgressPercent').innerText = `${percent}%`;
   document.getElementById('homeProgressBar').style.width = `${percent}%`;
   document.getElementById('homeProgressRatio').innerText = `${audited} / ${total} รายการ`;
@@ -387,6 +490,212 @@ function updateSummaryCards() {
   document.getElementById('homeDamaged').innerText = damaged;
   document.getElementById('homeLost').innerText = lost;
   document.getElementById('homePending').innerText = pending;
+
+  // Admin Dashboard
+  if (document.getElementById('admDashPercent')) {
+    document.getElementById('admDashPercent').innerText = `${percent}%`;
+    document.getElementById('admDashBar').style.width = `${percent}%`;
+    document.getElementById('admDashRatio').innerText = `${audited} / ${total}`;
+    document.getElementById('admStatTotal').innerText = total;
+    document.getElementById('admStatAudited').innerText = audited;
+    document.getElementById('admStatPending').innerText = pending;
+    document.getElementById('admStatIssue').innerText = damaged + lost;
+    renderAdminDashboardLists(damaged + lost);
+  }
+
+  // Executive Dashboard
+  if (document.getElementById('execTotalAssets')) {
+    const totalValue = activeAssets.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+    document.getElementById('execTotalAssets').innerText = total.toLocaleString();
+    document.getElementById('execTotalValue').innerText = `฿${totalValue.toLocaleString('th-TH', { maximumFractionDigits: 0 })}`;
+    document.getElementById('execDonutPercent').innerText = `${percent}%`;
+    document.getElementById('execNormal').innerText = normal;
+    document.getElementById('execDamaged').innerText = damaged;
+    document.getElementById('execLost').innerText = lost;
+    document.getElementById('execPending').innerText = pending;
+    renderExecutiveChartsAndNotes(activeAssets, audited, pending, normal, damaged, lost);
+  }
+}
+
+function renderAdminDashboardLists(issueCount) {
+  const actionWrap = document.getElementById('adminActionQueueList');
+  const recentWrap = document.getElementById('adminRecentAuditList');
+  if (!actionWrap || !recentWrap) return;
+
+  const issueItems = Object.values(auditedMap)
+    .filter(l => l.status === 'ชำรุด' || l.status === 'สูญหาย' || l.status === 'เสื่อมสภาพ/รอจำหน่าย')
+    .slice(-3)
+    .reverse();
+
+  document.getElementById('admActionCount').innerText = `${issueCount} รายการ`;
+
+  if (issueItems.length === 0) {
+    actionWrap.innerHTML = `<div class="text-slate-400 py-1">ไม่มีรายการชำรุดหรือสูญหายที่ต้องติดตาม</div>`;
+  } else {
+    actionWrap.innerHTML = issueItems.map(i => `
+      <div class="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2">
+        <div class="truncate pr-2">
+          <div class="font-semibold text-slate-800 truncate">${i.assetName}</div>
+          <div class="text-[10px] text-slate-500 font-mono">${i.assetCode}</div>
+        </div>
+        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 flex-shrink-0">${i.status}</span>
+      </div>
+    `).join('');
+  }
+
+  const recentLogs = Object.values(auditedMap).slice(-3).reverse();
+  if (recentLogs.length === 0) {
+    recentWrap.innerHTML = `<div class="text-slate-400 py-1">ยังไม่มีรายการตรวจล่าสุดในปีนี้</div>`;
+  } else {
+    recentWrap.innerHTML = recentLogs.map(l => `
+      <div class="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2">
+        <div class="truncate pr-2">
+          <div class="font-semibold text-slate-800 truncate">${l.assetName}</div>
+          <div class="text-[10px] text-slate-500">${l.inspector || '-'} • ${l.auditDate || ''}</div>
+        </div>
+        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex-shrink-0">${l.status}</span>
+      </div>
+    `).join('');
+  }
+}
+
+function groupAssetsByDept(assets) {
+  const map = {};
+  assets.forEach(a => {
+    const rawLoc = String(a.location || 'อื่นๆ').trim();
+    const dept = rawLoc.split(/[\/,]/)[0].trim() || 'อื่นๆ';
+    if (!map[dept]) map[dept] = { total: 0, audited: 0, value: 0 };
+    map[dept].total++;
+    map[dept].value += Number(a.price) || 0;
+    if (auditedMap[a.assetCode]) map[dept].audited++;
+  });
+  return Object.entries(map)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 5);
+}
+
+function renderExecutiveChartsAndNotes(activeAssets, audited, pending, normal, damaged, lost) {
+  const donutCtx = document.getElementById('execDonutChart');
+  if (donutCtx && typeof Chart !== 'undefined') {
+    if (execDonutChartInstance) execDonutChartInstance.destroy();
+    execDonutChartInstance = new Chart(donutCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['ปกติ', 'ชำรุด', 'ไม่พบ', 'รอตรวจ'],
+        datasets: [{
+          data: [normal, damaged, lost, pending],
+          backgroundColor: ['#10b981', '#f97316', '#ef4444', '#e2e8f0'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        cutout: '72%',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  const topDepts = groupAssetsByDept(activeAssets);
+  const deptCtx = document.getElementById('execDeptChart');
+  if (deptCtx && typeof Chart !== 'undefined') {
+    if (execDeptChartInstance) execDeptChartInstance.destroy();
+    execDeptChartInstance = new Chart(deptCtx, {
+      type: 'bar',
+      data: {
+        labels: topDepts.map(([d]) => d),
+        datasets: [{
+          label: 'ความคืบหน้า (%)',
+          data: topDepts.map(([, s]) => (s.total > 0 ? Math.round((s.audited / s.total) * 100) : 0)),
+          backgroundColor: '#2563eb',
+          borderRadius: 8,
+          maxBarThickness: 24
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%`, font: { size: 10 } } },
+          x: { ticks: { font: { size: 10 } } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  const notesEl = document.getElementById('execFollowUpList');
+  if (notesEl) {
+    const notes = [];
+    if (damaged > 0) notes.push(`พบครุภัณฑ์ชำรุด ${damaged} รายการ ควรตรวจสอบและซ่อมบำรุงหรือจำหน่าย`);
+    if (lost > 0) notes.push(`พบครุภัณฑ์ไม่พบ/สูญหาย ${lost} รายการ ควรเร่งค้นหาตามสถานที่ตั้งเดิม`);
+    if (pending > 0) notes.push(`ยังรอตรวจนับอีก ${pending} รายการ เร่งรัดการสแกนให้ครบตามรอบปี`);
+    if (notes.length === 0) notes.push('การตรวจนับครุภัณฑ์ดำเนินไปด้วยดี ยังไม่พบประเด็นเร่งด่วน');
+
+    notesEl.innerHTML = notes.map(n => `
+      <div class="flex items-start gap-2 bg-slate-50 rounded-xl px-3 py-2 text-slate-700">
+        <i class="bi bi-info-circle-fill text-blue-600 mt-0.5 flex-shrink-0"></i>
+        <span>${n}</span>
+      </div>
+    `).join('');
+  }
+}
+
+function renderExecAnalyticsScreen() {
+  const wrap = document.getElementById('execDeptBreakdownCards');
+  if (!wrap) return;
+  const activeAssets = allAssets.filter(a => a.status !== 'จำหน่าย');
+  const depts = groupAssetsByDept(activeAssets);
+  wrap.innerHTML = depts.map(([dept, s]) => {
+    const pct = s.total > 0 ? ((s.audited / s.total) * 100).toFixed(1) : 0;
+    return `
+      <div class="bg-slate-50 rounded-xl p-3 space-y-1.5">
+        <div class="flex justify-between font-semibold text-slate-800">
+          <span>${dept}</span>
+          <span class="text-blue-600">${pct}% (${s.audited}/${s.total})</span>
+        </div>
+        <div class="text-[11px] text-slate-500">มูลค่ารวม: ฿${s.value.toLocaleString('th-TH', { maximumFractionDigits: 0 })}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function downloadExecutivePDF() {
+  window.print();
+}
+
+function downloadExecutiveExcel() {
+  exportReportCSV();
+}
+
+function quickTransferModal() {
+  openAdminModal('edit', 0);
+}
+
+function quickDisposeModal() {
+  openAdminModal('edit', 0);
+  setTimeout(() => {
+    document.getElementById('admStatus').value = 'จำหน่าย';
+  }, 50);
+}
+
+function openUserManagementModal() {
+  Swal.fire({
+    title: 'จัดการผู้ใช้งานและสิทธิ์',
+    html: '<p class="text-xs text-slate-600">การเพิ่ม/แก้ไขรหัส PIN ผู้ใช้งานดำเนินการผ่านชีต Users ใน Google Sheets และสามารถปรับ Role ในหน้าโปรไฟล์ได้</p>',
+    confirmButtonText: 'รับทราบ'
+  });
+}
+
+function openAuditCycleModal() {
+  const year = document.getElementById('auditYear').value;
+  Swal.fire({
+    title: `รอบตรวจประจำปี ${year}`,
+    text: 'ระบบพร้อมเปิดรับผลการตรวจครุภัณฑ์สำหรับปีงบประมาณที่เลือก',
+    icon: 'info',
+    confirmButtonText: 'ตกลง'
+  });
 }
 
 async function openScannerScreen() {
@@ -397,7 +706,6 @@ async function openScannerScreen() {
   await startRearCamera();
 }
 
-// ปรับให้จับเฉพาะ QR_CODE, เพิ่ม fps เป็น 24 และตัดกรอบซ้อนออกให้เหลือเฉพาะกรอบสีฟ้าตรงกลาง
 async function startRearCamera() {
   document.getElementById('cameraErrorBox').classList.add('hidden');
 
@@ -751,9 +1059,9 @@ function openAdminModal(mode, index = null) {
   if (mode === 'add') {
     document.getElementById('adminModalTitle').innerText = 'ลงครุภัณฑ์ใหม่';
     document.getElementById('adminAssetForm').reset();
-  } else {
+  } else if (allAssets[index]) {
     const a = allAssets[index];
-    document.getElementById('adminModalTitle').innerText = 'แก้ไข / จำหน่ายครุภัณฑ์';
+    document.getElementById('adminModalTitle').innerText = 'แก้ไข / โอนย้าย / จำหน่ายครุภัณฑ์';
     document.getElementById('admRowIndex').value = a.rowIndex;
     document.getElementById('admCode').value = a.assetCode;
     document.getElementById('admAcquireDate').value = a.acquireDate;
