@@ -482,7 +482,6 @@ function updateSummaryCards() {
     else if (log.status === 'สูญหาย') lost++;
   });
 
-  // User Home
   document.getElementById('homeProgressPercent').innerText = `${percent}%`;
   document.getElementById('homeProgressBar').style.width = `${percent}%`;
   document.getElementById('homeProgressRatio').innerText = `${audited} / ${total} รายการ`;
@@ -491,7 +490,6 @@ function updateSummaryCards() {
   document.getElementById('homeLost').innerText = lost;
   document.getElementById('homePending').innerText = pending;
 
-  // Admin Dashboard
   if (document.getElementById('admDashPercent')) {
     document.getElementById('admDashPercent').innerText = `${percent}%`;
     document.getElementById('admDashBar').style.width = `${percent}%`;
@@ -503,7 +501,6 @@ function updateSummaryCards() {
     renderAdminDashboardLists(damaged + lost);
   }
 
-  // Executive Dashboard
   if (document.getElementById('execTotalAssets')) {
     const totalValue = activeAssets.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
     document.getElementById('execTotalAssets').innerText = total.toLocaleString();
@@ -698,6 +695,25 @@ function openAuditCycleModal() {
   });
 }
 
+function extractCodeFromScan(decodedText) {
+  let raw = String(decodedText || '').trim();
+  if (raw.includes('code=')) {
+    try {
+      raw = new URL(raw).searchParams.get('code') || raw;
+    } catch (_) {
+      const m = raw.match(/[?&]code=([^&]+)/i);
+      if (m && m[1]) raw = decodeURIComponent(m[1]);
+    }
+  }
+  return raw.trim();
+}
+
+function normalizeAssetCode(raw) {
+  const text = String(raw || '').trim();
+  const assetMatch = text.match(/\b\d{4}-\d{3}-\d{4}-\d{4}\b/);
+  return (assetMatch ? assetMatch[0] : text).replace(/\s+/g, '').toLowerCase();
+}
+
 async function openScannerScreen() {
   isScanHandling = false;
   switchScreen('scanner');
@@ -734,13 +750,7 @@ async function startRearCamera() {
     const onScanSuccess = async (decodedText) => {
       if (!isScanning || isScanHandling) return;
       isScanHandling = true;
-
-      let extractedCode = decodedText.trim();
-      if (decodedText.includes('code=')) {
-        try {
-          extractedCode = new URL(decodedText).searchParams.get('code') || extractedCode;
-        } catch (_) {}
-      }
+      const extractedCode = extractCodeFromScan(decodedText);
       await stopScannerSilently();
       openInspectScreen(extractedCode);
     };
@@ -852,9 +862,10 @@ function searchAssetManual(rawCode) {
 }
 
 function openInspectScreen(code) {
-  const asset = allAssets.find(a => a.assetCode.toLowerCase() === String(code).trim().toLowerCase());
+  const targetNorm = normalizeAssetCode(code);
+  const asset = allAssets.find(a => normalizeAssetCode(a.assetCode) === targetNorm);
   if (!asset) {
-    Swal.fire('ไม่พบข้อมูล', `ไม่พบรหัสครุภัณฑ์ "${code}" ในระบบ`, 'error');
+    Swal.fire('ไม่พบข้อมูล', `ไม่พบรหัสครุภัณฑ์ "${String(code).trim()}" ในระบบ`, 'error');
     return;
   }
 
