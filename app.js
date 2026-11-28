@@ -476,7 +476,7 @@ function resolveHomeScreenId() {
 }
 
 function switchScreen(screenName) {
-  if (screenName === 'users' && currentUser?.role !== 'admin') return;
+  if (['users','cycles'].includes(screenName) && currentUser?.role !== 'admin') return;
   if (activeScreen === 'scanner' && screenName !== 'scanner') stopScannerSilently();
   activeScreen = screenName;
 
@@ -493,7 +493,7 @@ function switchScreen(screenName) {
     'screen-history',
     'screen-profile',
     'screen-admin',
-    'screen-users'
+    'screen-users', 'screen-cycles'
   ].forEach(s => {
     const el = document.getElementById(s);
     if (el) el.classList.add('hidden');
@@ -770,13 +770,14 @@ async function refreshCycles(initial=false){
   if(auditCycles.some(r=>String(r.year)===String(preferred)))el.value=preferred;
   if(!auditCycles.length)el.add(new Option('ยังไม่มีรอบตรวจ',''));
 }
-async function openAuditCycleModal(){
-  if(currentUser.role!=='admin')return;
-  try{loadingStart(); try{await refreshCycles();loadingProgress(100,'โหลดข้อมูลเรียบร้อย');}finally{loadingEnd();} const options=auditCycles.map(r=>`${r.year} (${r.open?'เปิด':'ปิด'})`).join(', ');
-  const r=await Swal.fire({title:'จัดการรอบตรวจ',text:options||'ยังไม่มีรอบตรวจ',html:'<label>ปี พ.ศ.</label><input id="cycleYear" type="number" min="2500" max="2700" class="swal2-input"><label>สถานะ</label><select id="cycleStatus" class="swal2-select"><option value="open">เปิดรอบตรวจ</option><option value="closed">ปิดรอบตรวจ</option></select>',didOpen:()=>{document.getElementById('cycleYear').value=document.getElementById('auditYear').value||new Date().getFullYear()+543;},showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>({year:document.getElementById('cycleYear').value,open:document.getElementById('cycleStatus').value==='open'})});
-  if(r.isConfirmed){await adminApi('saveCycle',r.value);await refreshCycles(true);await loadAuditStatus();await Swal.fire('บันทึกแล้ว','','success');}
-  }catch(e){Swal.fire('ข้อผิดพลาด',e.message,'error');}
-}
+let cycleBusy47=false, cycleOriginal47=null;
+const cy47=id=>document.getElementById(id);
+function openAuditCycleModal(){if(currentUser?.role!=='admin')return;switchScreen('cycles');renderCycles47();refreshCyclePage47();}
+async function refreshCyclePage47(){if(cycleBusy47||currentUser?.role!=='admin')return;cycleBusy47=true;loadingStart();loadingProgress(25,'กำลังโหลดรอบตรวจ');try{await refreshCycles();renderCycles47();loadingProgress(100,'โหลดข้อมูลเรียบร้อย');cy47('cyError').textContent='';}catch(e){cy47('cyError').textContent=e.message;}finally{cycleBusy47=false;loadingEnd();}}
+function renderCycles47(){const q=cy47('cySearch').value.trim(), f=cy47('cyFilter').value;cy47('cyTotal').textContent=auditCycles.length;cy47('cyOpen').textContent=auditCycles.filter(x=>x.open).length;cy47('cyClosed').textContent=auditCycles.filter(x=>!x.open).length;const rows=auditCycles.filter(x=>String(x.year).includes(q)&&(!f||(f==='open')===x.open)).sort((a,b)=>b.year-a.year);cy47('cyList').innerHTML=rows.map(x=>`<article class="bg-white border rounded-2xl p-4 flex items-center gap-3"><span class="w-12 h-12 rounded-xl flex items-center justify-center ${x.open?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-600'}"><i class="bi bi-calendar-${x.open?'check':'x'} text-xl"></i></span><div class="flex-1"><div class="font-bold">ปี พ.ศ. ${Number(x.year)}</div><span class="text-xs ${x.open?'text-emerald-700':'text-slate-500'}">${x.open?'เปิดรอบตรวจ':'ปิดรอบตรวจ'}</span></div><button type="button" onclick="editCycle47(${Number(x.year)})" class="border rounded-xl px-3 py-2 text-blue-700 text-sm"><i class="bi bi-pencil-square"></i> แก้ไข</button></article>`).join('')||'<p class="text-center text-slate-500 p-6">ไม่พบรอบตรวจ</p>';}
+function editCycle47(year=null){if(cycleBusy47||currentUser?.role!=='admin')return;cycleOriginal47=year;const x=auditCycles.find(r=>Number(r.year)===year);cy47('cyTitle').textContent=x?'แก้ไขรอบตรวจ':'เพิ่มรอบตรวจใหม่';cy47('cyYear').value=x?x.year:new Date().getFullYear()+543;cy47('cyYear').readOnly=!!x;cy47('cyStatus').value=x&&!x.open?'closed':'open';cy47('cyFormError').textContent='';cy47('cyDialog').showModal();}
+function closeCycle47(){if(!cycleBusy47)cy47('cyDialog').close();}
+async function saveCycle47(e){e.preventDefault();if(cycleBusy47||currentUser?.role!=='admin')return;const year=Number(cy47('cyYear').value),open=cy47('cyStatus').value==='open';if(!Number.isInteger(year)||year<2500||year>2700||(cycleOriginal47===null&&auditCycles.some(x=>Number(x.year)===year))){cy47('cyFormError').textContent='ปีไม่ถูกต้องหรือมีรอบตรวจปีนี้แล้ว';return;}cycleBusy47=true;cy47('cySave').disabled=true;cy47('cySave').textContent='กำลังบันทึก...';try{await adminApi('saveCycle',{year,open});cy47('cyDialog').close();await refreshCycles();renderCycles47();await loadAuditStatus();cy47('cyNotice').textContent='บันทึกข้อมูลเรียบร้อย';}catch(e){cy47(cy47('cyDialog').open?'cyFormError':'cyError').textContent=e.message;}finally{cycleBusy47=false;cy47('cySave').disabled=false;cy47('cySave').textContent='บันทึกข้อมูล';}}
 let umCache = null, umPage = 1, umBusy = false, umOriginal = '', umRequest = null;
 const um = id => document.getElementById(id);
 const umRoleLabel = r => ({admin:'Administrator',user:'User',exec:'Executive'})[r] || r;
