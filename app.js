@@ -23,7 +23,8 @@ function showAssetImage(img, placeholder, label, link, value) {
   img.removeAttribute('src');
   img.classList.add('hidden');
   placeholder?.classList.remove('hidden');
-  if (link) { link.classList.add('hidden'); link.removeAttribute('href'); }
+  if (link) { link.classList.add('hidden'); link.onclick = null; }
+  img.onclick = null;
   if (label) label.textContent = urls.length ? 'กำลังโหลดรูปภาพ...' : 'ยังไม่มีรูปภาพ';
   if (!urls.length) return;
   img.onload = () => {
@@ -33,9 +34,10 @@ function showAssetImage(img, placeholder, label, link, value) {
   img.onerror = () => {
     if (++index < urls.length) { img.src = urls[index]; return; }
     img.classList.add('hidden'); placeholder?.classList.remove('hidden');
-    if (label) label.textContent = 'โหลดรูปไม่สำเร็จ — เปิดรูปต้นฉบับเพื่อตรวจสอบสิทธิ์';
+    if (label) label.textContent = 'โหลดรูปไม่สำเร็จ — แตะดูรูปเพื่อลองใหม่';
   };
-  if (link) { link.href = String(value).trim(); link.classList.remove('hidden'); }
+  if (link) { link.onclick = () => openAssetImageModal(value); link.classList.remove('hidden'); }
+  img.onclick = () => openAssetImageModal(value);
   img.src = urls[0];
 }
 const API_URL = 'https://script.google.com/macros/s/AKfycbx_D0_q4I_nRMfxy_z7abun7sWWmGxwRw6tiTslKrb_K4HQOyb75WlfCwwVXjfv5DBWOw/exec';
@@ -1233,3 +1235,53 @@ function printSelectedQRCodes() {
     window.print();
   }, 500);
 }
+
+// V3.2: in-page image viewer, no external navigation.
+let imageModalPreviousFocus = null;
+let imageModalOverflow = '';
+function openAssetImageModal(value) {
+  const urls = assetImageCandidates(value).map(url => {
+    const u = new URL(url);
+    if (u.hostname === 'drive.google.com' && u.pathname === '/thumbnail') {
+      u.searchParams.set('sz', 'w2000');
+      return u.href;
+    }
+    return url;
+  });
+  if (!urls.length) return;
+  const modal = document.getElementById('assetImageModal');
+  const img = document.getElementById('assetImageModalPhoto');
+  const status = document.getElementById('assetImageModalStatus');
+  imageModalPreviousFocus = document.activeElement;
+  imageModalOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  img.classList.add('hidden');
+  status.textContent = 'กำลังโหลดรูปภาพ...';
+  // Use high-resolution candidates directly.
+  let i = 0;
+  img.onclick = null;
+  img.onload = () => { img.classList.remove('hidden'); status.textContent = ''; };
+  img.onerror = () => {
+    if (++i < urls.length) { img.src = urls[i]; return; }
+    img.classList.add('hidden'); status.textContent = 'ไม่สามารถโหลดรูปภาพได้ กรุณาตรวจสอบสิทธิ์การเข้าถึง';
+  };
+  img.src = urls[0];
+  document.getElementById('assetImageModalClose').focus();
+}
+function closeAssetImageModal() {
+  const modal = document.getElementById('assetImageModal');
+  if (modal.classList.contains('hidden')) return;
+  modal.classList.add('hidden'); modal.classList.remove('flex');
+  const img = document.getElementById('assetImageModalPhoto');
+  img.onload = img.onerror = null; img.removeAttribute('src');
+  document.body.style.overflow = imageModalOverflow;
+  imageModalPreviousFocus?.focus();
+}
+document.addEventListener('keydown', e => {
+  const modal = document.getElementById('assetImageModal');
+  if (!modal || modal.classList.contains('hidden')) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeAssetImageModal(); }
+  if (e.key === 'Tab') { e.preventDefault(); document.getElementById('assetImageModalClose').focus(); }
+});
