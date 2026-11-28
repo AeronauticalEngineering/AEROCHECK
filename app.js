@@ -911,7 +911,7 @@ function openInspectScreen(code) {
   document.getElementById('formAssetCode').value = asset.assetCode;
   document.getElementById('formAssetName').value = asset.assetName;
   document.getElementById('formInspector').value = currentUser.fullName;
-  document.getElementById('formHolder').value = asset.holder || asset.note || '';
+  document.getElementById('formHolder').value = asset.holder || '';
   document.getElementById('formLocation').value = asset.location || '';
   document.getElementById('formNote').value = '';
   document.getElementById('formImage').value = '';
@@ -972,6 +972,8 @@ async function submitAuditForm(e) {
 
   const payload = {
     action: 'submitAudit',
+    username: currentUser.username,
+    pin: currentUser.pin,
     year: document.getElementById('auditYear').value,
     assetCode,
     assetName,
@@ -1083,63 +1085,52 @@ function renderAdminTable() {
   });
 }
 
-function openAdminModal(mode, index = null) {
-  const modal = document.getElementById('adminModal');
-  modal.classList.replace('hidden', 'flex');
-  document.getElementById('admMode').value = mode;
-
-  if (mode === 'add') {
-    document.getElementById('adminModalTitle').innerText = 'ลงครุภัณฑ์ใหม่';
-    document.getElementById('adminAssetForm').reset();
-  } else if (allAssets[index]) {
-    const a = allAssets[index];
-    document.getElementById('adminModalTitle').innerText = 'แก้ไข / โอนย้าย / จำหน่ายครุภัณฑ์';
-    document.getElementById('admRowIndex').value = a.rowIndex;
-    document.getElementById('admCode').value = a.assetCode;
-    document.getElementById('admAcquireDate').value = a.acquireDate;
-    document.getElementById('admName').value = a.assetName;
-    document.getElementById('admPrice').value = a.price;
-    document.getElementById('admLocation').value = a.location;
-    document.getElementById('admHolder').value = a.holder || a.note;
-    document.getElementById('admStatus').value = a.status;
-    document.getElementById('admNote').value = a.note;
+const admEl = id => document.getElementById(id);
+function showAdminDate() {
+  const d = admEl('admAcquireDate').value.split('-');
+  admEl('admDateThai').textContent = d.length === 3 ? `${d[2]}/${d[1]}/${Number(d[0])+543} (พ.ศ.)` : '';
+}
+function refreshAdminCategories() {
+  const main = admEl('admMainCategory').value;
+  for (const [id, values] of [['admMainList', allAssets.map(a=>a.mainCategory)], ['admSubList', allAssets.filter(a=>!main || a.mainCategory===main).map(a=>a.subCategory)]]) {
+    admEl(id).replaceChildren(...[...new Set(values.filter(Boolean))].sort().map(v=>{const o=document.createElement('option');o.value=v;return o;}));
   }
 }
-
-function closeAdminModal() {
-  document.getElementById('adminModal').classList.replace('flex', 'hidden');
+function refreshAdminQR() {
+  const box=admEl('admQR'); box.replaceChildren();
+  const code=admEl('admCode').value.trim();
+  if(code) { try {new QRCode(box,{text:code,width:112,height:112,correctLevel:QRCode.CorrectLevel.M});} catch(e){box.textContent='ไม่สามารถสร้าง QR';} }
 }
-
-async function saveAdminAsset(e) {
-  e.preventDefault();
-  const payload = {
-    action: 'saveAsset',
-    username: currentUser.username,
-    pin: currentUser.pin,
-    mode: document.getElementById('admMode').value,
-    rowIndex: Number(document.getElementById('admRowIndex').value),
-    assetCode: document.getElementById('admCode').value.trim(),
-    acquireDate: document.getElementById('admAcquireDate').value,
-    assetName: document.getElementById('admName').value.trim(),
-    price: document.getElementById('admPrice').value,
-    location: document.getElementById('admLocation').value,
-    holder: document.getElementById('admHolder').value,
-    status: document.getElementById('admStatus').value,
-    note: document.getElementById('admNote').value
-  };
-
-  Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-  const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-  const json = await res.json();
-
-  if (json.status === 'success') {
-    Swal.fire('สำเร็จ', json.message, 'success');
-    closeAdminModal();
-    await fetchAssets();
-    await loadAuditStatus();
-  } else {
-    Swal.fire('ผิดพลาด', json.message, 'error');
-  }
+function previewAdminImage(event) {
+  const f=event.target.files[0]; if(!f)return;
+  if(f.size>5*1024*1024 || !['image/jpeg','image/png','image/webp'].includes(f.type)){event.target.value=''; Swal.fire('เลือกไฟล์ JPG, PNG หรือ WebP ไม่เกิน 5 MB','','warning');return;}
+  const r=new FileReader();r.onload=()=>{if(event.target.files[0]!==f)return;admEl('admImagePreview').src=r.result;admEl('admImagePreview').classList.remove('hidden');admEl('admImageLabel').textContent=f.name;};r.readAsDataURL(f);
+}
+function openAdminModal(mode,index=null) {
+  if(currentUser?.role!=='admin')return;
+  const a=mode==='edit'?allAssets[index]:{}; if(!a)return;
+  admEl('adminAssetForm').reset();
+  const fields={admMode:mode,admRowIndex:a.rowIndex,admId:a.id,admOriginalCode:a.assetCode,admCode:a.assetCode,admAcquireDate:a.acquireDate,admName:a.assetName,admPrice:a.price,admLocation:a.location,admHolder:a.holder,admStatus:mode==='add'?'ใช้งานได้':(a.rawStatus??a.status),admNote:a.note,admMainCategory:a.mainCategory,admSubCategory:a.subCategory,admBudget:a.budget};
+  for(const [id,v] of Object.entries(fields))admEl(id).value=v??'';
+  const status=fields.admStatus; if(status && ![...admEl('admStatus').options].some(o=>o.value===status)){admEl('admStatus').add(new Option(status,status));admEl('admStatus').value=status;}
+  admEl('adminModalTitle').textContent=mode==='add'?'ลงครุภัณฑ์ใหม่':'แก้ไข / โอนย้าย / จำหน่ายครุภัณฑ์';
+  admEl('admMetadata').textContent=`ID: ${a.id??'อัตโนมัติ'}\nลงทะเบียน: ${a.regDate||'-'}\nผู้บันทึก: ${a.updatedBy||'-'}\nวันที่บันทึก: ${a.updatedDate||'-'}`;
+  const img=admEl('admImagePreview');img.removeAttribute('src');img.classList.add('hidden');admEl('admImageLabel').textContent=a.imageUrl?'รูปเดิมในทะเบียน':'ไม่มีรูปภาพ';
+  if(typeof a.imageUrl==='string' && /^https:\/\//i.test(a.imageUrl)){img.src=a.imageUrl;img.classList.remove('hidden');}
+  showAdminDate();if(a.acquireDateError)admEl('admDateThai').textContent='วันที่เดิมไม่ถูกต้อง: '+a.acquireDateError;refreshAdminCategories();refreshAdminQR();admEl('adminModal').classList.replace('hidden','flex');
+}
+function closeAdminModal(){admEl('adminModal').classList.replace('flex','hidden');}
+async function saveAdminAsset(e){
+  e.preventDefault();const btn=e.target.querySelector('button[type=submit]');if(btn.disabled)return;btn.disabled=true;
+  try{
+    const payload={action:'saveAsset',username:currentUser.username,pin:currentUser.pin};
+    for(const [key,id] of Object.entries({mode:'admMode',rowIndex:'admRowIndex',id:'admId',originalCode:'admOriginalCode',assetCode:'admCode',acquireDate:'admAcquireDate',assetName:'admName',price:'admPrice',location:'admLocation',holder:'admHolder',status:'admStatus',note:'admNote',mainCategory:'admMainCategory',subCategory:'admSubCategory',budget:'admBudget'}))payload[key]=admEl(id).value.trim();
+    if(payload.status==='จำหน่าย'){const r=await Swal.fire({title:'ยืนยันจำหน่ายครุภัณฑ์?',icon:'warning',showCancelButton:true,confirmButtonText:'ยืนยัน',cancelButtonText:'ยกเลิก'});if(!r.isConfirmed)return;}
+    const f=admEl('admImageFile').files[0];if(f){if(f.size>5*1024*1024 || !['image/jpeg','image/png','image/webp'].includes(f.type))throw Error('ไฟล์รูปไม่ถูกต้อง');payload.imageBase64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(f);});}
+    Swal.fire({title:'กำลังบันทึก...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+    const res=await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)});const json=await res.json();if(json.status!=='success')throw Error(json.message);
+    closeAdminModal();await fetchAssets();await loadAuditStatus();Swal.fire('สำเร็จ',json.message,'success');
+  }catch(err){Swal.fire('ผิดพลาด',err.message||String(err),'error');}finally{btn.disabled=false;}
 }
 
 function exportReportCSV() {
@@ -1152,7 +1143,7 @@ function exportReportCSV() {
       `"${a.assetName.replace(/"/g, '""')}"`,
       a.price,
       `"${log ? log.location : a.location}"`,
-      `"${log ? log.holder : (a.holder || a.note)}"`,
+      `"${log ? log.holder : (a.holder || '')}"`,
       `"${a.status === 'จำหน่าย' ? 'จำหน่ายแล้ว' : (log ? log.status : 'ยังไม่ตรวจ')}"`,
       `"${log ? log.inspector : '-'}"`,
       `"${log ? log.auditDate : '-'}"`
