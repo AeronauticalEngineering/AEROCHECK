@@ -1,3 +1,43 @@
+
+// V3.1: display Drive images without changing stored URLs.
+function assetImageCandidates(value) {
+  try {
+    const u = new URL(String(value || '').trim());
+    if (u.protocol !== 'https:') return [];
+    if (u.hostname === 'drive.google.com') {
+      const id = u.searchParams.get('id') || u.pathname.match(/\/file\/d\/([\w-]+)/)?.[1];
+      if (id && /^[\w-]+$/.test(id)) {
+        const key = u.searchParams.get('resourcekey');
+        const extra = key ? '&resourcekey=' + encodeURIComponent(key) : '';
+        return ['https://drive.google.com/thumbnail?id='+id+'&sz=w1000'+extra,
+          'https://drive.google.com/uc?export=view&id='+id+extra];
+      }
+    }
+    return [u.href];
+  } catch (_) { return []; }
+}
+function showAssetImage(img, placeholder, label, link, value) {
+  const urls = assetImageCandidates(value);
+  let index = 0;
+  img.onload = img.onerror = null;
+  img.removeAttribute('src');
+  img.classList.add('hidden');
+  placeholder?.classList.remove('hidden');
+  if (link) { link.classList.add('hidden'); link.removeAttribute('href'); }
+  if (label) label.textContent = urls.length ? 'กำลังโหลดรูปภาพ...' : 'ยังไม่มีรูปภาพ';
+  if (!urls.length) return;
+  img.onload = () => {
+    img.classList.remove('hidden'); placeholder?.classList.add('hidden');
+    if (label) label.textContent = 'รูปภาพในทะเบียน';
+  };
+  img.onerror = () => {
+    if (++index < urls.length) { img.src = urls[index]; return; }
+    img.classList.add('hidden'); placeholder?.classList.remove('hidden');
+    if (label) label.textContent = 'โหลดรูปไม่สำเร็จ — เปิดรูปต้นฉบับเพื่อตรวจสอบสิทธิ์';
+  };
+  if (link) { link.href = String(value).trim(); link.classList.remove('hidden'); }
+  img.src = urls[0];
+}
 const API_URL = 'https://script.google.com/macros/s/AKfycbx_D0_q4I_nRMfxy_z7abun7sWWmGxwRw6tiTslKrb_K4HQOyb75WlfCwwVXjfv5DBWOw/exec';
 
 let allAssets = [];
@@ -899,14 +939,7 @@ function openInspectScreen(code) {
   const imgEl = document.getElementById('dispAssetImage');
   const phEl = document.getElementById('dispAssetPlaceholder');
   const imgUrl = auditedMap[asset.assetCode]?.imageUrl || asset.imageUrl;
-  if (imgUrl) {
-    imgEl.src = imgUrl;
-    imgEl.classList.remove('hidden');
-    phEl.classList.add('hidden');
-  } else {
-    imgEl.classList.add('hidden');
-    phEl.classList.remove('hidden');
-  }
+  showAssetImage(imgEl, phEl, document.getElementById('dispImageStatus'), document.getElementById('dispImageLink'), imgUrl);
 
   document.getElementById('formAssetCode').value = asset.assetCode;
   document.getElementById('formAssetName').value = asset.assetName;
@@ -1104,7 +1137,7 @@ function refreshAdminQR() {
 function previewAdminImage(event) {
   const f=event.target.files[0]; if(!f)return;
   if(f.size>5*1024*1024 || !['image/jpeg','image/png','image/webp'].includes(f.type)){event.target.value=''; Swal.fire('เลือกไฟล์ JPG, PNG หรือ WebP ไม่เกิน 5 MB','','warning');return;}
-  const r=new FileReader();r.onload=()=>{if(event.target.files[0]!==f)return;admEl('admImagePreview').src=r.result;admEl('admImagePreview').classList.remove('hidden');admEl('admImageLabel').textContent=f.name;};r.readAsDataURL(f);
+  const r=new FileReader();r.onload=()=>{if(event.target.files[0]!==f)return;admEl('admImagePreview').onload=admEl('admImagePreview').onerror=null;admEl('admImageLink').classList.add('hidden');admEl('admImagePreview').src=r.result;admEl('admImagePreview').classList.remove('hidden');admEl('admImageLabel').textContent=f.name;};r.readAsDataURL(f);
 }
 function openAdminModal(mode,index=null) {
   if(currentUser?.role!=='admin')return;
@@ -1115,8 +1148,7 @@ function openAdminModal(mode,index=null) {
   const status=fields.admStatus; if(status && ![...admEl('admStatus').options].some(o=>o.value===status)){admEl('admStatus').add(new Option(status,status));admEl('admStatus').value=status;}
   admEl('adminModalTitle').textContent=mode==='add'?'ลงครุภัณฑ์ใหม่':'แก้ไข / โอนย้าย / จำหน่ายครุภัณฑ์';
   admEl('admMetadata').textContent=`ID: ${a.id??'อัตโนมัติ'}\nลงทะเบียน: ${a.regDate||'-'}\nผู้บันทึก: ${a.updatedBy||'-'}\nวันที่บันทึก: ${a.updatedDate||'-'}`;
-  const img=admEl('admImagePreview');img.removeAttribute('src');img.classList.add('hidden');admEl('admImageLabel').textContent=a.imageUrl?'รูปเดิมในทะเบียน':'ไม่มีรูปภาพ';
-  if(typeof a.imageUrl==='string' && /^https:\/\//i.test(a.imageUrl)){img.src=a.imageUrl;img.classList.remove('hidden');}
+  showAssetImage(admEl('admImagePreview'), null, admEl('admImageLabel'), admEl('admImageLink'), a.imageUrl);
   showAdminDate();if(a.acquireDateError)admEl('admDateThai').textContent='วันที่เดิมไม่ถูกต้อง: '+a.acquireDateError;refreshAdminCategories();refreshAdminQR();admEl('adminModal').classList.replace('hidden','flex');
 }
 function closeAdminModal(){admEl('adminModal').classList.replace('flex','hidden');}
