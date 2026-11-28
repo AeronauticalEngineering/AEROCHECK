@@ -1476,3 +1476,32 @@ function chooseGuideRole412(role){if(currentUser||!guideSteps412[role])return;gu
 function openGuide412(){guideRole412=currentUser?.role||'user';if(!guideSteps412[guideRole412])guideRole412='user';guideIndex412=0;document.getElementById('guideRole412').hidden=!!currentUser;renderGuide412();document.getElementById('guide412').showModal();}
 function renderGuide412(){const steps=guideSteps412[guideRole412],s=steps[guideIndex412],el=id=>document.getElementById(id);[...el('guideRole412').children].forEach((b,i)=>b.setAttribute('aria-pressed',String(['user','admin','exec'][i]===guideRole412)));el('guideProgress412').innerHTML=steps.map((_,i)=>`<span style="background:${i<=guideIndex412?'#2563eb':'#e2e8f0'}"></span>`).join('');el('guideStep412').textContent=`STEP ${String(guideIndex412+1).padStart(2,'0')} / ${String(steps.length).padStart(2,'0')}`;el('guideTitle412').textContent=s[0];el('guideDesc412').textContent=s[1];el('guideIcon412').className='bi bi-'+s[2];const rows=el('guideRows412');rows.replaceChildren();const add=(t,c='')=>{const d=document.createElement('div');d.textContent=t;d.className=c;rows.append(d);return d;};if(s[2]==='person-lock'){add('Username');add('●  ●  ●  ●');const keys=add('','g-keys');for(let i=1;i<=9;i++){const k=document.createElement('span');k.textContent=i;keys.append(k);}add('เข้าสู่ระบบ','g-primary');}else{s[3].forEach((t,i)=>add(t,i===s[3].length-1&&/บันทึก|พิมพ์|Export/.test(t)?'g-primary':''));}el('guideDots412').replaceChildren(...steps.map((_,i)=>{const b=document.createElement('button');b.type='button';b.setAttribute('aria-label','ขั้นตอน '+(i+1));b.setAttribute('aria-current',String(i===guideIndex412));b.onclick=()=>{guideIndex412=i;renderGuide412();};return b;}));el('guideBack412').disabled=guideIndex412===0;el('guideNext412').textContent=guideIndex412===steps.length-1?'เสร็จสิ้น ✓':'ถัดไป ›';}
 function moveGuide412(n){const next=guideIndex412+n;if(next>=guideSteps412[guideRole412].length){document.getElementById('guide412').close();return;}guideIndex412=Math.max(0,next);renderGuide412();}
+
+// V4.14: illustrated quick-start preview, isolated from application data.
+const guideColors414={user:'#2563eb',admin:'#7c3aed',exec:'#059669'};
+const guideOriginalRender414=renderGuide412;
+renderGuide412=function(){
+ guideOriginalRender414();
+ const root=document.getElementById('guide412'), color=guideColors414[guideRole412], s=guideSteps412[guideRole412][guideIndex412], rows=document.getElementById('guideRows412');
+ root.style.setProperty('--guide-color',color);
+ root.querySelectorAll('#guideProgress412 span').forEach((e,i)=>e.style.background=i<=guideIndex412?color:'#e2e8f0');
+ const icon=document.getElementById('guideIcon412');icon.hidden=true;
+ const field=(t,i='')=>`<div class="gp-field">${i?`<i class="bi bi-${i}"></i>`:''}<span>${t}</span></div>`;
+ const primary=t=>`<div class="gp-action">${t}</div>`;
+ const dashboard=()=>`<div class="gp-progress">ความคืบหน้าการตรวจ<strong>75%</strong><div><b></b></div></div><div class="gp-grid">${[['450','ปกติ','#059669'],['10','ชำรุด','#f97316'],['5','ไม่พบ','#dc2626'],['155','รอตรวจ','#475569']].map(([n,t,c])=>`<div><strong style="color:${c}">${n}</strong>${t}</div>`).join('')}</div>`;
+ const asset=()=>`<div class="gp-asset"><i class="bi bi-box-seam"></i><div><b>ชื่อครุภัณฑ์</b><small>XXXX-XXX-XXXX-XXXX</small></div></div>`;
+ let html='';
+ switch(s[2]){
+ case 'person-lock':html=`<div class="gp-logo"><i class="bi bi-qr-code"></i></div>${field('Username')}<div class="gp-pin">● ● ● ●</div><div class="gp-keys">${Array.from({length:9},(_,i)=>`<span>${i+1}</span>`).join('')}</div>${primary('เข้าสู่ระบบ')}`;break;
+ case 'speedometer2':case 'clock-history':html=dashboard();break;
+ case 'box-seam':html=asset()+(guideRole412==='admin'?`<div class="gp-grid gp-tools">${['เพิ่มใหม่','แก้ไข','โอนย้าย','จำหน่าย'].map((t,i)=>`<div><i class="bi bi-${['plus-circle','pencil-square','arrow-left-right','archive'][i]}"></i>${t}</div>`).join('')}</div>${primary('พิมพ์ QR Code')}`:field('ประเภทครุภัณฑ์','layers')+field('ผู้ถือครอง','person')+field('สถานที่ตั้ง','geo-alt'));break;
+ case 'database':html=`<div class="gp-grid gp-tools">${['ประเภทหลัก','ประเภทย่อย','งบที่ซื้อ','ตำแหน่งที่ตั้ง'].map(t=>`<div>${t}</div>`).join('')}</div>${primary('+ เพิ่มรายการใหม่')}${field('ประเภท','layers')}${field('งบที่ซื้อ','wallet')}${field('ตำแหน่งที่ตั้ง','geo-alt')}`;break;
+ case 'qr-code-scan':html=`<div class="gp-scan"><i class="bi bi-qr-code-scan"></i></div>${primary('สแกน QR Code')}${field('ค้นหารหัสครุภัณฑ์','search')}`;break;
+ case 'clipboard-check':html=`<div class="gp-grid gp-tools gp-three">${['ปกติ','ชำรุด','ไม่พบ'].map((t,i)=>`<div style="color:${['#059669','#f97316','#dc2626'][i]}"><i class="bi bi-${['check-circle-fill','exclamation-circle-fill','x-circle-fill'][i]}"></i>${t}</div>`).join('')}</div>${field('ผู้ถือครอง','person')}${field('สถานที่ตั้ง','geo-alt')}${field('เพิ่มรูปภาพ (ถ้ามี)','camera')}${primary('บันทึกผลการตรวจ')}`;break;
+ case 'people':html=primary('+ เพิ่มผู้ใช้งาน')+field('Username','person')+field('Role: user / admin / exec','shield-check')+field('Active / Deactive','toggle-on');break;
+ case 'calendar-check':case 'calendar3':html=`<div class="gp-logo"><i class="bi bi-calendar-check"></i></div>${field('ปี พ.ศ. 2569','calendar3')}${field('เปิดรอบตรวจ','check-circle')}${guideRole412==='admin'?primary('จัดการรอบตรวจ'):''}`;break;
+ case 'exclamation-triangle':html=`<div class="gp-grid"><div><strong style="color:#f97316">10</strong>ชำรุด</div><div><strong style="color:#dc2626">5</strong>ไม่พบ</div></div>${field('รายการที่ต้องดำเนินการ','list-check')}${field('ชื่อครุภัณฑ์','box-seam')}`;break;
+ default:html=`<div class="gp-logo"><i class="bi bi-${s[2]}"></i></div>${field('รายงานผลการตรวจ','file-earmark-text')}${field('ปี พ.ศ. 2569','calendar3')}${guideRole412==='admin'?primary('Export CSV'):dashboard()}`;
+ }
+ rows.innerHTML=html;
+};
