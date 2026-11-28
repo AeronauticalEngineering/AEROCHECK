@@ -34,7 +34,7 @@ function showAssetImage(img, placeholder, label, link, value) {
   img.onerror = () => {
     if (++index < urls.length) { img.src = urls[index]; return; }
     img.classList.add('hidden'); placeholder?.classList.remove('hidden');
-    if (label) label.textContent = 'โหลดรูปไม่สำเร็จ — แตะดูรูปเพื่อลองใหม่';
+    if (label) label.textContent = 'โหลดรูปไม่สำเร็จ';
   };
   if (link) { link.onclick = () => openAssetImageModal(value); link.classList.remove('hidden'); }
   img.onclick = () => openAssetImageModal(value);
@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const savedSession = localStorage.getItem('asset_user_session');
   if (savedSession) {
     currentUser = JSON.parse(savedSession);
+    try { const auth = await adminApi("login"); currentUser = {...currentUser, ...auth.user}; localStorage.setItem("asset_user_session", JSON.stringify(currentUser)); } catch(e) { localStorage.removeItem("asset_user_session"); currentUser=null; return; }
     applyRolePermissions();
     await initData();
   }
@@ -124,6 +125,7 @@ function clearPin() {
 }
 
 async function initData() {
+  await refreshCycles(true);
   await fetchAssets();
   await loadAuditStatus();
 
@@ -337,7 +339,7 @@ function toggleEditProfile() {
 
   const roleSelect = document.getElementById('profInputRole');
   roleSelect.value = currentUser.role || 'user';
-  roleSelect.disabled = currentUser.role !== 'admin';
+  roleSelect.disabled = true;
 }
 
 function cancelEditProfile() {
@@ -378,7 +380,7 @@ function saveProfileChanges(e) {
   const newEmail = document.getElementById('profInputEmail').value.trim();
   const newPhone = document.getElementById('profInputPhone').value.trim();
   const roleSelect = document.getElementById('profInputRole');
-  const newRole = currentUser.role === 'admin' ? roleSelect.value : currentUser.role;
+  const newRole = currentUser.role;
 
   currentUser = {
     ...currentUser,
@@ -708,33 +710,35 @@ function downloadExecutiveExcel() {
   exportReportCSV();
 }
 
-function quickTransferModal() {
-  openAdminModal('edit', 0);
+async function adminApi(action, fields={}) {
+  const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({...fields,action,username:currentUser.username,pin:currentUser.pin})});
+  const j=await res.json(); if(j.status!=='success') throw Error(j.message||'เกิดข้อผิดพลาด'); return j;
 }
-
-function quickDisposeModal() {
-  openAdminModal('edit', 0);
-  setTimeout(() => {
-    document.getElementById('admStatus').value = 'จำหน่าย';
-  }, 50);
+let auditCycles=[];
+async function refreshCycles(initial=false){
+  const j=await adminApi('getCycles'); auditCycles=j.data;
+  const el=document.getElementById('auditYear'), old=el.value;
+  el.replaceChildren();
+  for(const r of auditCycles){const o=new Option('ปี '+r.year+(r.open?' • เปิด':' • ปิด'),r.year);el.add(o);}
+  const preferred=initial?auditCycles.find(r=>r.open)?.year:old;
+  if(auditCycles.some(r=>String(r.year)===String(preferred)))el.value=preferred;
+  if(!auditCycles.length)el.add(new Option('ยังไม่มีรอบตรวจ',''));
 }
-
-function openUserManagementModal() {
-  Swal.fire({
-    title: 'จัดการผู้ใช้งานและสิทธิ์',
-    html: '<p class="text-xs text-slate-600">การเพิ่ม/แก้ไขรหัส PIN ผู้ใช้งานดำเนินการผ่านชีต Users ใน Google Sheets และสามารถปรับ Role ในหน้าโปรไฟล์ได้</p>',
-    confirmButtonText: 'รับทราบ'
-  });
+async function openAuditCycleModal(){
+  if(currentUser.role!=='admin')return;
+  try{await refreshCycles(); const options=auditCycles.map(r=>`${r.year} (${r.open?'เปิด':'ปิด'})`).join(', ');
+  const r=await Swal.fire({title:'จัดการรอบตรวจ',text:options||'ยังไม่มีรอบตรวจ',html:'<label>ปี พ.ศ.</label><input id="cycleYear" type="number" min="2500" max="2700" class="swal2-input"><label>สถานะ</label><select id="cycleStatus" class="swal2-select"><option value="open">เปิดรอบตรวจ</option><option value="closed">ปิดรอบตรวจ</option></select>',didOpen:()=>{document.getElementById('cycleYear').value=document.getElementById('auditYear').value||new Date().getFullYear()+543;},showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>({year:document.getElementById('cycleYear').value,open:document.getElementById('cycleStatus').value==='open'})});
+  if(r.isConfirmed){await adminApi('saveCycle',r.value);await refreshCycles(true);await loadAuditStatus();await Swal.fire('บันทึกแล้ว','','success');}
+  }catch(e){Swal.fire('ข้อผิดพลาด',e.message,'error');}
 }
-
-function openAuditCycleModal() {
-  const year = document.getElementById('auditYear').value;
-  Swal.fire({
-    title: `รอบตรวจประจำปี ${year}`,
-    text: 'ระบบพร้อมเปิดรับผลการตรวจครุภัณฑ์สำหรับปีงบประมาณที่เลือก',
-    icon: 'info',
-    confirmButtonText: 'ตกลง'
-  });
+async function openUserManagementModal(){
+  if(currentUser.role!=='admin')return;
+  try{const j=await adminApi('getUsers');const choices={'__new__':'เพิ่มผู้ใช้งานใหม่'};j.data.forEach((u,i)=>choices[i]=u.username+' — '+u.fullName+' ('+u.role+', '+u.status+')');
+  const pick=await Swal.fire({title:'จัดการผู้ใช้งาน',input:'select',inputOptions:choices,showCancelButton:true,confirmButtonText:'ดำเนินการ'});if(!pick.isConfirmed)return;
+  const u=pick.value==='__new__'?{}:j.data[Number(pick.value)];
+  const r=await Swal.fire({title:u.username?'แก้ไขผู้ใช้งาน':'เพิ่มผู้ใช้งาน',html:'<div class="text-left space-y-2"><label>Username<input id="umName" class="w-full border rounded-lg p-2"></label><label>PIN (4 หลัก; เว้นว่างเพื่อคงเดิม)<input id="umPin" type="password" inputmode="numeric" maxlength="4" class="w-full border rounded-lg p-2"></label><label>Full name<input id="umFull" class="w-full border rounded-lg p-2"></label><label>Role<select id="umRole" class="w-full border rounded-lg p-2"><option>user</option><option>admin</option><option>exec</option></select></label><label>Status<select id="umStatus" class="w-full border rounded-lg p-2"><option>Active</option><option>Deactive</option></select></label></div>',didOpen:()=>{for(const [id,v] of Object.entries({umName:u.username,umFull:u.fullName,umRole:u.role||'user',umStatus:u.status||'Active'}))document.getElementById(id).value=v||'';},showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>({originalUsername:u.username||'',newUsername:document.getElementById('umName').value,newPin:document.getElementById('umPin').value,fullName:document.getElementById('umFull').value,role:document.getElementById('umRole').value,status:document.getElementById('umStatus').value})});
+  if(r.isConfirmed){await adminApi('saveUser',r.value);if(u.username?.toLowerCase()===currentUser.username.toLowerCase()){currentUser.username=r.value.newUsername.trim();currentUser.pin=r.value.newPin||currentUser.pin;currentUser.fullName=r.value.fullName;localStorage.setItem('asset_user_session',JSON.stringify(currentUser));applyRolePermissions();}await Swal.fire('บันทึกแล้ว','','success');}
+  }catch(e){Swal.fire('ข้อผิดพลาด',e.message,'error');}
 }
 
 function extractCodeFromScan(decodedText) {
@@ -1002,6 +1006,8 @@ function previewImage(event) {
 
 async function submitAuditForm(e) {
   e.preventDefault();
+  try { await refreshCycles(); } catch(err) { Swal.fire("ข้อผิดพลาด",err.message,"error"); return; }
+  if(!auditCycles.some(r=>String(r.year)===document.getElementById("auditYear").value&&r.open)){Swal.fire("รอบตรวจปิดอยู่","กรุณาติดต่อ Admin","warning");return;}
   const assetName = document.getElementById('formAssetName').value;
   const assetCode = document.getElementById('formAssetCode').value;
 
@@ -1139,7 +1145,7 @@ function refreshAdminQR() {
 function previewAdminImage(event) {
   const f=event.target.files[0]; if(!f)return;
   if(f.size>5*1024*1024 || !['image/jpeg','image/png','image/webp'].includes(f.type)){event.target.value=''; Swal.fire('เลือกไฟล์ JPG, PNG หรือ WebP ไม่เกิน 5 MB','','warning');return;}
-  const r=new FileReader();r.onload=()=>{if(event.target.files[0]!==f)return;admEl('admImagePreview').onload=admEl('admImagePreview').onerror=null;admEl('admImageLink').classList.add('hidden');admEl('admImagePreview').src=r.result;admEl('admImagePreview').classList.remove('hidden');admEl('admImageLabel').textContent=f.name;};r.readAsDataURL(f);
+  const r=new FileReader();r.onload=()=>{if(event.target.files[0]!==f)return;admEl('admImagePreview').onload=admEl('admImagePreview').onerror=null;admEl('admImagePreview').src=r.result;admEl('admImagePreview').classList.remove('hidden');admEl('admImageLabel').textContent=f.name;};r.readAsDataURL(f);
 }
 function openAdminModal(mode,index=null) {
   if(currentUser?.role!=='admin')return;
