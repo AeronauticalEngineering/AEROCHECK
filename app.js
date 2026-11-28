@@ -53,8 +53,27 @@ let compressedImageBase64 = '';
 let tempAvatarBase64 = '';
 let latestStats = { total: 0, audited: 0 };
 let activeScreen = "home", dashboardFilter = "", dashboardLimit = 30, loadingDepth = 0, dataReady = false, reportSequence = 0;
-function loadingStart(){ loadingDepth++; document.getElementById("dataLoading").classList.remove("hidden"); }
-function loadingEnd(){ if(--loadingDepth <= 0){loadingDepth=0; document.getElementById("dataLoading").classList.add("hidden");} }
+let loadingPercent = 0;
+function loadingProgress(percent, message) {
+  loadingPercent = Math.max(loadingPercent, percent);
+  document.getElementById('loadingPercent45').textContent = loadingPercent + '%';
+  document.getElementById('loadingBar45').style.width = loadingPercent + '%';
+  document.getElementById('loadingTrack45').setAttribute('aria-valuenow', loadingPercent);
+  if (message) document.getElementById('loadingMessage45').textContent = message;
+}
+function loadingStart(){
+  if (loadingDepth++ === 0) {
+    loadingPercent = 0;
+    loadingProgress(0, 'กำลังเชื่อมต่อระบบ');
+    document.getElementById('dataLoading').classList.remove('hidden');
+  }
+}
+function loadingEnd(){
+  if (--loadingDepth <= 0) {
+    loadingDepth = 0;
+    document.getElementById('dataLoading').classList.add('hidden');
+  }
+}
 function escape44(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function auditGroup(a){const l=auditedMap[a.assetCode]; if(!l)return "pending"; if(["ใช้งานได้","ปกติ"].includes(l.status))return "normal"; if(["ชำรุด","เสื่อมสภาพ/รอจำหน่าย"].includes(l.status))return "damaged"; if(["สูญหาย","ไม่พบ"].includes(l.status))return "lost"; return "other";}
 function chooseDashboardFilter(v){dashboardFilter=v;dashboardLimit=30;document.getElementById("dashboardSearch").value="";renderDashboardFilter();}
@@ -143,7 +162,10 @@ function clearPin() {
 
 async function initData() {
   loadingStart();
-  try { await Promise.all([refreshCycles(true), fetchAssets()]); await loadAuditStatus(); dataReady=true; } catch(err){ Swal.fire("โหลดข้อมูลไม่สำเร็จ",err.message,"error"); return; } finally { loadingEnd(); }
+  try { let completed = 0;
+    const stageDone = () => loadingProgress(++completed * 25, 'กำลังโหลดทะเบียนและรอบตรวจ');
+    await Promise.all([refreshCycles(true).then(stageDone), fetchAssets().then(stageDone)]);
+    await loadAuditStatus(); dataReady=true; } catch(err){ Swal.fire("โหลดข้อมูลไม่สำเร็จ",err.message,"error"); return; } finally { loadingEnd(); }
 
   const urlParams = new URLSearchParams(window.location.search);
   const codeParam = urlParams.get('code');
@@ -511,6 +533,7 @@ async function fetchAssets() {
 
 async function loadAuditStatus() {
   const seq=++reportSequence; loadingStart();
+  loadingProgress(loadingPercent, "กำลังดึงผลตรวจครุภัณฑ์ประจำปี");
   const year = document.getElementById('auditYear').value;
   document.getElementById('homeCycleYear').innerText = year;
   if (document.getElementById('admDashYear')) document.getElementById('admDashYear').innerText = year;
@@ -523,6 +546,7 @@ async function loadAuditStatus() {
       if(seq!==reportSequence)return;
       dataReady=true;
       auditedMap = json.auditedMap;
+      loadingProgress(75, "กำลังประมวลผลรายการ");
       latestStats = { total: json.totalAssets, audited: json.auditedCount };
       updateSummaryCards();
       if(activeScreen === "history") renderHistoryScreen();
@@ -531,6 +555,7 @@ async function loadAuditStatus() {
       if(activeScreen === "exec-analytics") renderExecAnalyticsScreen();
       renderDashboardFilter();
       if (document.getElementById('formAssetCode').value) updateInspectBadge();
+      loadingProgress(100, 'โหลดข้อมูลเรียบร้อย');
     } else throw Error(json.message || "โหลดผลตรวจไม่สำเร็จ");
   } catch (err) { if(seq===reportSequence) { auditedMap={}; dataReady=false; Swal.fire("โหลดผลตรวจไม่สำเร็จ",err.message,"error"); } throw err; } finally { loadingEnd(); }
 }
@@ -745,14 +770,14 @@ async function refreshCycles(initial=false){
 }
 async function openAuditCycleModal(){
   if(currentUser.role!=='admin')return;
-  try{loadingStart(); try{await refreshCycles();}finally{loadingEnd();} const options=auditCycles.map(r=>`${r.year} (${r.open?'เปิด':'ปิด'})`).join(', ');
+  try{loadingStart(); try{await refreshCycles();loadingProgress(100,'โหลดข้อมูลเรียบร้อย');}finally{loadingEnd();} const options=auditCycles.map(r=>`${r.year} (${r.open?'เปิด':'ปิด'})`).join(', ');
   const r=await Swal.fire({title:'จัดการรอบตรวจ',text:options||'ยังไม่มีรอบตรวจ',html:'<label>ปี พ.ศ.</label><input id="cycleYear" type="number" min="2500" max="2700" class="swal2-input"><label>สถานะ</label><select id="cycleStatus" class="swal2-select"><option value="open">เปิดรอบตรวจ</option><option value="closed">ปิดรอบตรวจ</option></select>',didOpen:()=>{document.getElementById('cycleYear').value=document.getElementById('auditYear').value||new Date().getFullYear()+543;},showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>({year:document.getElementById('cycleYear').value,open:document.getElementById('cycleStatus').value==='open'})});
   if(r.isConfirmed){await adminApi('saveCycle',r.value);await refreshCycles(true);await loadAuditStatus();await Swal.fire('บันทึกแล้ว','','success');}
   }catch(e){Swal.fire('ข้อผิดพลาด',e.message,'error');}
 }
 async function openUserManagementModal(){
   if(currentUser.role!=='admin')return;
-  try{loadingStart(); let j;try{j=await adminApi('getUsers');}finally{loadingEnd();}const choices={'__new__':'เพิ่มผู้ใช้งานใหม่'};j.data.forEach((u,i)=>choices[i]=u.username+' — '+u.fullName+' ('+u.role+', '+u.status+')');
+  try{loadingStart(); let j;try{j=await adminApi('getUsers');loadingProgress(100,'โหลดข้อมูลเรียบร้อย');}finally{loadingEnd();}const choices={'__new__':'เพิ่มผู้ใช้งานใหม่'};j.data.forEach((u,i)=>choices[i]=u.username+' — '+u.fullName+' ('+u.role+', '+u.status+')');
   const pick=await Swal.fire({title:'จัดการผู้ใช้งาน',input:'select',inputOptions:choices,showCancelButton:true,confirmButtonText:'ดำเนินการ'});if(!pick.isConfirmed)return;
   const u=pick.value==='__new__'?{}:j.data[Number(pick.value)];
   const r=await Swal.fire({title:u.username?'แก้ไขผู้ใช้งาน':'เพิ่มผู้ใช้งาน',html:'<div class="text-left space-y-2"><label>Username<input id="umName" class="w-full border rounded-lg p-2"></label><label>PIN (4 หลัก; เว้นว่างเพื่อคงเดิม)<input id="umPin" type="password" inputmode="numeric" maxlength="4" class="w-full border rounded-lg p-2"></label><label>Full name<input id="umFull" class="w-full border rounded-lg p-2"></label><label>Role<select id="umRole" class="w-full border rounded-lg p-2"><option>user</option><option>admin</option><option>exec</option></select></label><label>Status<select id="umStatus" class="w-full border rounded-lg p-2"><option>Active</option><option>Deactive</option></select></label></div>',didOpen:()=>{for(const [id,v] of Object.entries({umName:u.username,umFull:u.fullName,umRole:u.role||'user',umStatus:u.status||'Active'}))document.getElementById(id).value=v||'';},showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>({originalUsername:u.username||'',newUsername:document.getElementById('umName').value,newPin:document.getElementById('umPin').value,fullName:document.getElementById('umFull').value,role:document.getElementById('umRole').value,status:document.getElementById('umStatus').value})});
@@ -1000,7 +1025,11 @@ function openInspectScreen(code) {
   compressedImageBase64 = '';
 
   updateInspectBadge();
-  selectStatusBtn('');
+  const previousStatus = auditedMap[asset.assetCode]?.status;
+  const savedStatus = ['ใช้งานได้','ปกติ'].includes(previousStatus) ? 'ใช้งานได้'
+    : ['ชำรุด','เสื่อมสภาพ/รอจำหน่าย'].includes(previousStatus) ? 'ชำรุด'
+    : ['สูญหาย','ไม่พบ'].includes(previousStatus) ? 'สูญหาย' : '';
+  selectStatusBtn(savedStatus);
 }
 
 function selectStatusBtn(statusValue) {
