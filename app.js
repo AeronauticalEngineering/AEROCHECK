@@ -714,146 +714,167 @@ function normalizeAssetCode(raw) {
   return (assetMatch ? assetMatch[0] : text).replace(/\s+/g, '').toLowerCase();
 }
 
+// Smart QR Scanner V2 — serialize camera start/stop operations.
+let cameraQueue = Promise.resolve();
+let cameraGeneration = 0;
+let cameraTrack = null;
+let cameraReadyAt = 0;
+let torchOn = false;
+let scanAudio = null;
+const scannerVisible = () => !document.getElementById('screen-scanner').classList.contains('hidden') && !!currentUser;
+function queueCamera(task) {
+  const next = cameraQueue.then(task, task);
+  cameraQueue = next.catch(console.warn);
+  return next;
+}
+function scannerStatus(text, success = false) {
+  document.getElementById('scannerStatus').textContent = text;
+  document.getElementById('scannerStatus').style.color = success ? '#4ade80' : '';
+  document.getElementById('cameraViewBox').style.borderColor = success ? '#4ade80' : ''; 
+}
+function prepareScanAudio() {
+  try {
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (Audio) { scanAudio ||= new Audio(); scanAudio.resume().catch(() => {}); }
+  } catch (_) {}
+}
+function scanFeedback() {
+  try {
+    if (scanAudio?.state === 'running') {
+      const osc = scanAudio.createOscillator(), gain = scanAudio.createGain();
+      osc.frequency.value = 880; gain.gain.value = 0.08;
+      osc.connect(gain); gain.connect(scanAudio.destination);
+      osc.start(); osc.stop(scanAudio.currentTime + 0.12);
+    }
+    navigator.vibrate?.(60);
+  } catch (_) {}
+}
 async function openScannerScreen() {
-  isScanHandling = false;
+  prepareScanAudio();
   switchScreen('scanner');
-  document.getElementById('cameraErrorBox').classList.add('hidden');
-  document.getElementById('scanFrameOverlay').classList.remove('hidden');
   await startRearCamera();
 }
-
-async function startRearCamera() {
-  document.getElementById('cameraErrorBox').classList.add('hidden');
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showCameraError(
-      'เบราว์เซอร์นี้ไม่รองรับการเปิดกล้องสด',
-      'หากเปิดผ่าน LINE ให้กดเปิดผ่าน Safari หรือ Chrome และตรวจสอบการเชื่อมต่อ HTTPS'
-    );
-    return;
+async function releaseCamera() {
+  const cam = html5QrCode;
+  html5QrCode = null; isScanning = false; cameraTrack = null; torchOn = false;
+  document.getElementById('scannerTorch').setAttribute('aria-pressed', 'false');
+  if (cam) {
+    try { await cam.stop(); } catch (_) {}
+    try { cam.clear(); } catch (_) {}
   }
-
-  try {
-    await stopScannerSilently();
-    document.getElementById('reader').innerHTML = '';
-
-    const qrOnlyFormats = typeof Html5QrcodeSupportedFormats !== 'undefined'
-      ? [Html5QrcodeSupportedFormats.QR_CODE]
-      : undefined;
-
-    html5QrCode = new Html5Qrcode("reader", {
-      formatsToSupport: qrOnlyFormats,
-      useBarCodeDetectorIfSupported: true,
-      verbose: false
-    });
-
-    const onScanSuccess = async (decodedText) => {
-      if (!isScanning || isScanHandling) return;
-      isScanHandling = true;
-      const extractedCode = extractCodeFromScan(decodedText);
-      await stopScannerSilently();
-      openInspectScreen(extractedCode);
-    };
-
-    const fastConfig = {
-      fps: 24,
-      qrbox: { width: 224, height: 224 },
-      aspectRatio: 1.0,
-      videoConstraints: {
-        facingMode: "environment",
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      }
-    };
-
-    try {
-      await html5QrCode.start({ facingMode: "environment" }, fastConfig, onScanSuccess);
-    } catch (_) {
-      const cameras = await Html5Qrcode.getCameras();
-      if (cameras && cameras.length > 0) {
-        const backCam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
-        await html5QrCode.start(backCam.id, { fps: 24, qrbox: { width: 224, height: 224 } }, onScanSuccess);
-      } else {
-        throw new Error('No camera found');
-      }
-    }
-
-    isScanning = true;
-  } catch (err) {
-    isScanning = false;
-    const msg = String(err?.message || err);
-    showCameraError(
-      'ไม่สามารถเปิดกล้องได้ในหน้าต่างนี้',
-      `สาเหตุ: ${msg} — กรุณาอนุญาตการใช้กล้องในการตั้งค่าเบราว์เซอร์ หรือเปิดผ่าน Safari / Chrome`
-    );
-  }
+  const reader = document.getElementById('reader');
+  reader.querySelectorAll('video').forEach(v => {
+    v.srcObject?.getTracks().forEach(t => t.stop()); v.srcObject = null;
+  });
+  reader.innerHTML = '';
+  for (const id of ['scannerTorch','scannerZoom']) document.getElementById(id).classList.add('hidden');
 }
-
+function stopScannerSilently() {
+  ++cameraGeneration; isScanning = false; isScanHandling = true;
+  return queueCamera(releaseCamera);
+}
+function startRearCamera() {
+  const generation = ++cameraGeneration;
+  isScanHandling = true;
+  return queueCamera(async () => {
+    await releaseCamera();
+    if (generation !== cameraGeneration || !scannerVisible()) return;
+    document.getElementById('cameraErrorBox').classList.add('hidden');
+    document.getElementById('scanFrameOverlay').classList.remove('hidden');
+    scannerStatus('กำลังเปิดกล้อง…');
+    if (!navigator.mediaDevices?.getUserMedia || typeof Html5Qrcode === 'undefined') {
+      showCameraError('ไม่สามารถเปิดกล้องได้', 'ตรวจสอบ HTTPS หรือเปิดผ่าน Safari / Chrome'); return;
+    }
+    const onSuccess = async decodedText => {
+      if (generation !== cameraGeneration || !isScanning || isScanHandling) return;
+      isScanHandling = true;
+      let code;
+      try { code = extractCodeFromScan(decodedText); } catch (_) { code = String(decodedText).trim(); }
+      console.info('[QR] Camera ready to decode (ms):', Math.round(performance.now() - cameraReadyAt));
+      scannerStatus('อ่าน QR Code สำเร็จ', true); scanFeedback();
+      const asset = allAssets.find(a => normalizeAssetCode(a.assetCode) === normalizeAssetCode(code));
+      if (asset) {
+        // switchScreen queues camera cleanup; do not block the inspection UI.
+        openInspectScreen(code);
+      } else {
+        await stopScannerSilently();
+        if (!scannerVisible()) return;
+        await Swal.fire('ไม่พบข้อมูล', `ไม่พบรหัสครุภัณฑ์ "${code}" ในระบบ`, 'error');
+        if (scannerVisible()) startRearCamera();
+      }
+    };
+    const config = {
+      fps: 15, disableFlip: true,
+      qrbox: (w,h) => { const size = Math.floor(Math.min(w,h)*0.72); return {width:size,height:size}; }
+    };
+    try {
+      html5QrCode = new Html5Qrcode('reader', {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        useBarCodeDetectorIfSupported: true, verbose: false
+      });
+      try {
+        await html5QrCode.start({facingMode:'environment'}, {...config, videoConstraints:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}}, onSuccess);
+      } catch (err) {
+        if (generation !== cameraGeneration || !scannerVisible()) { await releaseCamera(); return; }
+        if (/NotAllowed|Permission|denied/i.test(String(err))) throw err;
+        await releaseCamera();
+        html5QrCode = new Html5Qrcode('reader', {formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],useBarCodeDetectorIfSupported:true,verbose:false});
+        await html5QrCode.start({facingMode:'environment'}, config, onSuccess);
+      }
+      if (generation !== cameraGeneration || !scannerVisible()) { await releaseCamera(); return; }
+      isScanning = true; isScanHandling = false; cameraReadyAt = performance.now();
+      scannerStatus('พร้อมสแกน QR Code');
+      const video = document.querySelector('#reader video');
+      cameraTrack = video?.srcObject?.getVideoTracks()[0] || null;
+      const caps = cameraTrack?.getCapabilities?.() || {};
+      if (caps.torch) document.getElementById('scannerTorch').classList.remove('hidden');
+      if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+        const z = document.getElementById('scannerZoom');
+        z.min = caps.zoom.min; z.max = caps.zoom.max; z.step = caps.zoom.step || 0.1;
+        z.value = cameraTrack.getSettings().zoom || caps.zoom.min; z.classList.remove('hidden');
+      }
+      if (caps.focusMode?.includes('continuous')) cameraTrack.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(() => {});
+    } catch (err) {
+      await releaseCamera();
+      if (generation === cameraGeneration && scannerVisible()) showCameraError('ไม่สามารถเปิดกล้องได้', String(err?.message || err));
+    }
+  });
+}
+async function toggleScannerTorch() {
+  const track = cameraTrack;
+  if (!track?.getCapabilities?.().torch) return;
+  try { await track.applyConstraints({advanced:[{torch:!torchOn}]}); if (track === cameraTrack) { torchOn = !torchOn; document.getElementById('scannerTorch').setAttribute('aria-pressed', String(torchOn)); } } catch (_) { scannerStatus('อุปกรณ์ไม่สามารถเปิดไฟฉายได้'); }
+}
+async function setScannerZoom(value) {
+  try { await cameraTrack?.applyConstraints({advanced:[{zoom:Number(value)}]}); } catch (_) { scannerStatus('ไม่สามารถปรับซูมได้'); }
+}
 function showCameraError(title, desc) {
   document.getElementById('cameraErrorTitle').innerText = title;
   document.getElementById('cameraErrorDesc').innerText = desc;
   document.getElementById('cameraErrorBox').classList.remove('hidden');
   document.getElementById('scanFrameOverlay').classList.add('hidden');
+  scannerStatus('กล้องไม่พร้อมใช้งาน');
 }
-
-async function retryCamera() {
-  isScanHandling = false;
-  await startRearCamera();
-}
-
-function openInExternalBrowser() {
-  const url = window.location.href;
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
-
-async function stopScannerSilently() {
-  const cam = html5QrCode;
-  const active = isScanning;
-  isScanning = false;
-  html5QrCode = null;
-
-  if (cam) {
-    try {
-      if (active) await cam.stop();
-    } catch (_) {}
-    try {
-      await cam.clear();
-    } catch (_) {}
-  }
-
-  const readerEl = document.getElementById('reader');
-  if (readerEl) {
-    readerEl.querySelectorAll('video').forEach(vid => {
-      if (vid.srcObject && typeof vid.srcObject.getTracks === 'function') {
-        vid.srcObject.getTracks().forEach(t => t.stop());
-      }
-      vid.srcObject = null;
-    });
-    readerEl.innerHTML = '';
-  }
-}
-
-async function closeScannerScreen() {
-  document.getElementById('screen-scanner').classList.add('hidden');
-  switchScreen('home');
+function retryCamera() { prepareScanAudio(); return startRearCamera(); }
+function openInExternalBrowser() { window.open(window.location.href, '_blank', 'noopener,noreferrer'); }
+function closeScannerScreen() { switchScreen('home'); }
+async function promptManualCode() {
   await stopScannerSilently();
+  if (!scannerVisible()) return;
+  const res = await Swal.fire({title:'พิมพ์รหัสครุภัณฑ์',input:'text',inputPlaceholder:'เช่น 7440-001-8716-6110',showCancelButton:true,confirmButtonText:'ค้นหา',cancelButtonText:'ยกเลิก'});
+  if (!scannerVisible()) return;
+  if (res.isConfirmed && res.value?.trim()) {
+    const code = res.value.trim();
+    if (allAssets.some(a => normalizeAssetCode(a.assetCode) === normalizeAssetCode(code))) { openInspectScreen(code); return; }
+    await Swal.fire('ไม่พบข้อมูล', `ไม่พบรหัสครุภัณฑ์ "${code}" ในระบบ`, 'error');
+  }
+  if (scannerVisible()) startRearCamera();
 }
-
-function promptManualCode() {
-  Swal.fire({
-    title: 'พิมพ์รหัสครุภัณฑ์',
-    input: 'text',
-    inputPlaceholder: 'เช่น 7440-001-8716-6110',
-    showCancelButton: true,
-    confirmButtonText: 'ค้นหา',
-    cancelButtonText: 'ยกเลิก'
-  }).then(async res => {
-    if (res.isConfirmed && res.value && res.value.trim()) {
-      await stopScannerSilently();
-      openInspectScreen(res.value.trim());
-    }
-  });
-}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopScannerSilently();
+  else if (scannerVisible() && !Swal.isVisible()) startRearCamera();
+});
+window.addEventListener('pagehide', () => { cameraTrack?.stop(); stopScannerSilently(); });
 
 function searchAssetManual(rawCode) {
   const code = String(rawCode || '').trim();
