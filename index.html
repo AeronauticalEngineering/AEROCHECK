@@ -18,6 +18,10 @@
     #reader video { display: block; width: 100%; height: auto; object-fit: contain; }
     #scanFrameOverlay { display: none !important; }
     #reader { position: relative; }
+    #loginUsername { font-size: 16px; }
+    #loginForm button { touch-action: manipulation; transition: none; }
+    #loginForm button:disabled { opacity: .65; }
+    #pinDotsDisplay .pin-dot { transition: none; }
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
@@ -40,7 +44,7 @@
       <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-3">
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">ชื่อผู้ใช้ (Username)</label>
-          <input type="text" id="loginUsername" required placeholder="ระบุชื่อผู้ใช้"
+          <input type="text" id="loginUsername" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required placeholder="ระบุชื่อผู้ใช้"
             class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
         </div>
 
@@ -49,7 +53,7 @@
             <label class="text-xs font-medium text-slate-600">รหัส PIN 4 หลัก (กดจากแป้นตัวเลขเท่านั้น)</label>
             <span id="pinCountLabel" class="text-xs font-bold text-blue-600">0 / 4 หลัก</span>
           </div>
-          <input type="hidden" id="loginPin" required>
+          <input type="hidden" id="loginPin">
           <div id="pinDotsDisplay" class="flex justify-center gap-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl select-none">
             <span class="pin-dot w-4 h-4 rounded-full bg-slate-300 transition-all"></span>
             <span class="pin-dot w-4 h-4 rounded-full bg-slate-300 transition-all"></span>
@@ -58,7 +62,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-2 pt-1 select-none">
+        <div id="pinKeypad" tabindex="0" aria-label="แป้น PIN" class="grid grid-cols-3 gap-2 pt-1 select-none">
           <button type="button" onclick="pressPin('1')" class="bg-slate-100 hover:bg-slate-200 active:bg-blue-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">1</button>
           <button type="button" onclick="pressPin('2')" class="bg-slate-100 hover:bg-slate-200 active:bg-blue-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">2</button>
           <button type="button" onclick="pressPin('3')" class="bg-slate-100 hover:bg-slate-200 active:bg-blue-100 text-slate-800 font-bold py-2.5 rounded-xl text-base transition">3</button>
@@ -73,7 +77,8 @@
           <button type="button" onclick="backspacePin()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl text-base transition"><i class="bi bi-backspace"></i></button>
         </div>
 
-        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl shadow transition mt-2">
+        <p id="loginMessage" role="status" class="text-xs text-red-600 empty:hidden"></p>
+        <button id="loginSubmit" type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl shadow transition mt-2">
           เข้าสู่ระบบ
         </button>
       </form>
@@ -663,6 +668,6 @@
       <p id="assetImageModalStatus" role="status" class="text-sm text-center"></p>
     </div>
   </div>
-  <script src="app.js?v=20261128-audit41"></script>
+  <script src="app.js?v=20261128-fastlogin42"></script>
 </body>
 </html>
