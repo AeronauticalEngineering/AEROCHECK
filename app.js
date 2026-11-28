@@ -506,6 +506,8 @@ async function loadAuditStatus() {
       updateSummaryCards();
       renderHistoryScreen();
       renderAdminTable();
+      renderAssetListScreen();
+      if (document.getElementById('formAssetCode').value) updateInspectBadge();
     }
   } catch (err) {
     console.error(err);
@@ -594,7 +596,7 @@ function renderAdminDashboardLists(issueCount) {
           <div class="font-semibold text-slate-800 truncate">${l.assetName}</div>
           <div class="text-[10px] text-slate-500">${l.inspector || '-'} • ${l.auditDate || ''}</div>
         </div>
-        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex-shrink-0">${l.status}</span>
+        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${getAssetAuditStatus(l.assetCode).color} flex-shrink-0">${getAssetAuditStatus(l.assetCode).label}</span>
       </div>
     `).join('');
   }
@@ -928,6 +930,28 @@ function searchAssetManual(rawCode) {
   openInspectScreen(code);
 }
 
+function getAssetAuditStatus(assetCode, assetStatus = '') {
+  const log = auditedMap[String(assetCode).trim()];
+  if (assetStatus === 'จำหน่าย') return {label:'จำหน่ายแล้ว', color:'bg-slate-200 text-slate-700'};
+  if (!log) return {label:'รอตรวจ', color:'bg-slate-100 text-slate-600'};
+  if (['ใช้งานได้','ปกติ'].includes(log.status)) return {label:'ตรวจแล้ว · ปกติ', color:'bg-emerald-100 text-emerald-700'};
+  if (['ชำรุด','เสื่อมสภาพ/รอจำหน่าย'].includes(log.status)) return {label:'ตรวจแล้ว · ชำรุด', color:'bg-orange-100 text-orange-700'};
+  if (['สูญหาย','ไม่พบ'].includes(log.status)) return {label:'ตรวจแล้ว · ไม่พบ', color:'bg-red-100 text-red-700'};
+  return {label:'ตรวจแล้ว', color:'bg-slate-100 text-slate-700'};
+}
+function updateInspectBadge() {
+  const code = document.getElementById('formAssetCode').value;
+  const state = getAssetAuditStatus(code, allAssets.find(a=>a.assetCode===code)?.status);
+  const badge = document.getElementById('badgeFound');
+  badge.className = 'inline-block mt-1 text-[10px] font-semibold px-2.5 py-0.5 rounded-full '+state.color;
+  badge.textContent = state.label;
+}
+function updateAuditSubmit() {
+  const form = document.getElementById('auditForm');
+  const valid = ['ใช้งานได้','ชำรุด','สูญหาย'].includes(document.getElementById('formStatus').value) && document.getElementById('formHolder').value.trim() && document.getElementById('formLocation').value.trim();
+  form.querySelector('button[type="submit"]').disabled = !valid;
+}
+
 function openInspectScreen(code) {
   const targetNorm = normalizeAssetCode(code);
   const asset = allAssets.find(a => normalizeAssetCode(a.assetCode) === targetNorm);
@@ -940,7 +964,7 @@ function openInspectScreen(code) {
   document.getElementById('dispName').innerText = asset.assetName;
   document.getElementById('dispCode').innerText = `รหัส ${asset.assetCode}`;
   document.getElementById('dispBaselineInfo').innerText = `ทะเบียนเดิม: ${asset.holder || '-'} | ${asset.location || '-'}`;
-  document.getElementById('badgeFound').classList.remove('hidden');
+
 
   const imgEl = document.getElementById('dispAssetImage');
   const phEl = document.getElementById('dispAssetPlaceholder');
@@ -957,12 +981,13 @@ function openInspectScreen(code) {
   document.getElementById('imagePreview').classList.add('hidden');
   compressedImageBase64 = '';
 
-  const initStatus = asset.status === 'ชำรุด' ? 'ชำรุด' : (asset.status === 'สูญหาย' ? 'สูญหาย' : 'ใช้งานได้');
-  selectStatusBtn(initStatus);
+  updateInspectBadge();
+  selectStatusBtn('');
 }
 
 function selectStatusBtn(statusValue) {
   document.getElementById('formStatus').value = statusValue;
+  updateAuditSubmit();
 
   const btnNormal = document.getElementById('btnStatusNormal');
   const btnDamaged = document.getElementById('btnStatusDamaged');
@@ -1006,8 +1031,10 @@ function previewImage(event) {
 
 async function submitAuditForm(e) {
   e.preventDefault();
+  if (!['ใช้งานได้','ชำรุด','สูญหาย'].includes(document.getElementById('formStatus').value) || !document.getElementById('formHolder').value.trim() || !document.getElementById('formLocation').value.trim()) { Swal.fire('กรุณากรอกข้อมูลให้ครบ','','warning'); return; }
+  const selectedYear = document.getElementById('auditYear').value;
   try { await refreshCycles(); } catch(err) { Swal.fire("ข้อผิดพลาด",err.message,"error"); return; }
-  if(!auditCycles.some(r=>String(r.year)===document.getElementById("auditYear").value&&r.open)){Swal.fire("รอบตรวจปิดอยู่","กรุณาติดต่อ Admin","warning");return;}
+  if(document.getElementById("auditYear").value !== selectedYear || !auditCycles.some(r=>String(r.year)===selectedYear&&r.open)){Swal.fire("รอบตรวจปิดอยู่","กรุณาติดต่อ Admin","warning");return;}
   const assetName = document.getElementById('formAssetName').value;
   const assetCode = document.getElementById('formAssetCode').value;
 
@@ -1061,15 +1088,15 @@ function renderAssetListScreen() {
 
   const items = allAssets.filter(a => a.status !== 'จำหน่าย' && `${a.assetCode} ${a.assetName}`.toLowerCase().includes(q)).slice(0, 80);
   wrap.innerHTML = items.map(a => {
-    const done = !!auditedMap[a.assetCode];
+    const state = getAssetAuditStatus(a.assetCode, a.status);
     return `
       <div onclick="openInspectScreen('${a.assetCode}')" class="bg-white rounded-xl p-3 border border-slate-200/80 flex items-center justify-between gap-2 cursor-pointer hover:border-blue-400">
         <div class="min-w-0">
           <div class="text-xs font-semibold text-slate-900 truncate">${a.assetName}</div>
           <div class="text-[11px] text-slate-500 font-mono">${a.assetCode}</div>
         </div>
-        <span class="text-[10px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
-          ${done ? 'ตรวจแล้ว' : 'รอตรวจ'}
+        <span class="text-[10px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${state.color}">
+          ${state.label}
         </span>
       </div>
     `;
@@ -1090,7 +1117,7 @@ function renderHistoryScreen() {
         <div class="text-xs font-semibold text-slate-900 truncate">${l.assetName}</div>
         <div class="text-[11px] text-slate-500 font-mono">${l.assetCode} • ${l.auditDate || ''}</div>
       </div>
-      <span class="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 flex-shrink-0">${l.status}</span>
+      <span class="text-[10px] font-semibold px-2.5 py-1 rounded-full ${getAssetAuditStatus(l.assetCode).color} flex-shrink-0">${getAssetAuditStatus(l.assetCode).label}</span>
     </div>
   `).join('');
 }
@@ -1105,12 +1132,8 @@ function renderAdminTable() {
     const str = `${asset.assetCode} ${asset.assetName} ${asset.status}`.toLowerCase();
     if (keyword && !str.includes(keyword)) return;
 
-    const log = auditedMap[asset.assetCode];
-    const statusBadge = asset.status === 'จำหน่าย'
-      ? `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">จำหน่าย</span>`
-      : (log
-          ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-xs">ตรวจแล้ว (${log.status})</span>`
-          : `<span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs">ยังไม่ตรวจ</span>`);
+    const state = getAssetAuditStatus(asset.assetCode, asset.status);
+    const statusBadge = `<span class="${state.color} px-2 py-0.5 rounded-full text-xs">${state.label}</span>`;
 
     tbody.innerHTML += `
       <tr class="hover:bg-slate-50">
