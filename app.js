@@ -51,7 +51,15 @@ let isLoggingIn = false;
 let currentUser = null;
 let compressedImageBase64 = '';
 let tempAvatarBase64 = '';
-let latestStats = { total: 599, audited: 0 };
+let latestStats = { total: 0, audited: 0 };
+let activeScreen = "home", dashboardFilter = "", dashboardLimit = 30, loadingDepth = 0, dataReady = false, reportSequence = 0;
+function loadingStart(){ loadingDepth++; document.getElementById("dataLoading").classList.remove("hidden"); }
+function loadingEnd(){ if(--loadingDepth <= 0){loadingDepth=0; document.getElementById("dataLoading").classList.add("hidden");} }
+function escape44(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function auditGroup(a){const l=auditedMap[a.assetCode]; if(!l)return "pending"; if(["ใช้งานได้","ปกติ"].includes(l.status))return "normal"; if(["ชำรุด","เสื่อมสภาพ/รอจำหน่าย"].includes(l.status))return "damaged"; if(["สูญหาย","ไม่พบ"].includes(l.status))return "lost"; return "other";}
+function chooseDashboardFilter(v){dashboardFilter=v;dashboardLimit=30;document.getElementById("dashboardSearch").value="";renderDashboardFilter();}
+function renderDashboardFilter(){const panel=document.getElementById("dashboardResults"); if(!dashboardFilter){panel.classList.add("hidden");return;} panel.classList.remove("hidden");document.querySelectorAll("[data-audit-filter]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.auditFilter===dashboardFilter)));const q=document.getElementById("dashboardSearch").value.toLowerCase();const rows=allAssets.filter(a=>a.status!=="จำหน่าย"&&auditGroup(a)===dashboardFilter&&`${a.assetCode} ${a.assetName} ${a.location}`.toLowerCase().includes(q));document.getElementById("dashboardTitle").textContent=({normal:"ปกติ",damaged:"ชำรุด",lost:"ไม่พบ",pending:"รอตรวจ"})[dashboardFilter]+" · "+rows.length+" รายการ";document.getElementById("dashboardItems").innerHTML=rows.slice(0,dashboardLimit).map(a=>`<button type="button" data-code="${escape44(a.assetCode)}" class="w-full text-left bg-white border rounded-xl p-3"><div class="font-semibold text-sm">${escape44(a.assetName)}</div><div class="text-xs text-slate-500">${escape44(a.assetCode)} · ${escape44(a.location)}</div></button>`).join("")||"<p class=\"text-center text-slate-500 p-4\">ไม่มีรายการ</p>";document.getElementById("dashboardMore").classList.toggle("hidden",rows.length<=dashboardLimit);}
+
 let execDonutChartInstance = null;
 let execDeptChartInstance = null;
 
@@ -134,9 +142,8 @@ function clearPin() {
 }
 
 async function initData() {
-  await refreshCycles(true);
-  await fetchAssets();
-  await loadAuditStatus();
+  loadingStart();
+  try { await Promise.all([refreshCycles(true), fetchAssets()]); await loadAuditStatus(); dataReady=true; } catch(err){ Swal.fire("โหลดข้อมูลไม่สำเร็จ",err.message,"error"); return; } finally { loadingEnd(); }
 
   const urlParams = new URLSearchParams(window.location.search);
   const codeParam = urlParams.get('code');
@@ -447,9 +454,8 @@ function resolveHomeScreenId() {
 }
 
 function switchScreen(screenName) {
-  if (screenName !== 'scanner') {
-    stopScannerSilently();
-  }
+  if (activeScreen === 'scanner' && screenName !== 'scanner') stopScannerSilently();
+  activeScreen = screenName;
 
   [
     'screen-home-user',
@@ -498,16 +504,13 @@ async function fetchAssets() {
     const json = await res.json();
     if (json.status === 'success') {
       allAssets = json.data;
-      updateSummaryCards();
-      renderAssetListScreen();
-      renderAdminTable();
-    }
-  } catch (err) {
-    console.error(err);
-  }
+      if(json.status !== "success") throw Error(json.message);
+    } else throw Error(json.message || "โหลดทะเบียนไม่สำเร็จ");
+  } catch (err) { throw err; }
 }
 
 async function loadAuditStatus() {
+  const seq=++reportSequence; loadingStart();
   const year = document.getElementById('auditYear').value;
   document.getElementById('homeCycleYear').innerText = year;
   if (document.getElementById('admDashYear')) document.getElementById('admDashYear').innerText = year;
@@ -517,32 +520,30 @@ async function loadAuditStatus() {
     const res = await fetch(`${API_URL}?action=getAuditReport&year=${year}`);
     const json = await res.json();
     if (json.status === 'success') {
+      if(seq!==reportSequence)return;
+      dataReady=true;
       auditedMap = json.auditedMap;
       latestStats = { total: json.totalAssets, audited: json.auditedCount };
       updateSummaryCards();
-      renderHistoryScreen();
-      renderAdminTable();
-      renderAssetListScreen();
+      if(activeScreen === "history") renderHistoryScreen();
+      if(activeScreen === "admin") renderAdminTable();
+      if(activeScreen === "list") renderAssetListScreen();
+      if(activeScreen === "exec-analytics") renderExecAnalyticsScreen();
+      renderDashboardFilter();
       if (document.getElementById('formAssetCode').value) updateInspectBadge();
-    }
-  } catch (err) {
-    console.error(err);
-  }
+    } else throw Error(json.message || "โหลดผลตรวจไม่สำเร็จ");
+  } catch (err) { if(seq===reportSequence) { auditedMap={}; dataReady=false; Swal.fire("โหลดผลตรวจไม่สำเร็จ",err.message,"error"); } throw err; } finally { loadingEnd(); }
 }
 
 function updateSummaryCards() {
   const activeAssets = allAssets.filter(a => a.status !== 'จำหน่าย');
-  const total = latestStats.total || activeAssets.length || 599;
+  const total = latestStats.total || activeAssets.length;
   const audited = latestStats.audited || 0;
   const pending = Math.max(0, total - audited);
   const percent = total > 0 ? Number(((audited / total) * 100).toFixed(1)) : 0;
 
   let normal = 0, damaged = 0, lost = 0;
-  Object.values(auditedMap).forEach(log => {
-    if (log.status === 'ใช้งานได้') normal++;
-    else if (log.status === 'ชำรุด' || log.status === 'เสื่อมสภาพ/รอจำหน่าย') damaged++;
-    else if (log.status === 'สูญหาย') lost++;
-  });
+  activeAssets.forEach(a=>{const g=auditGroup(a);if(g==="normal")normal++;else if(g==="damaged")damaged++;else if(g==="lost")lost++;});
 
   document.getElementById('homeProgressPercent').innerText = `${percent}%`;
   document.getElementById('homeProgressBar').style.width = `${percent}%`;
@@ -552,7 +553,7 @@ function updateSummaryCards() {
   document.getElementById('homeLost').innerText = lost;
   document.getElementById('homePending').innerText = pending;
 
-  if (document.getElementById('admDashPercent')) {
+  if (currentUser?.role === 'admin' && document.getElementById('admDashPercent')) {
     document.getElementById('admDashPercent').innerText = `${percent}%`;
     document.getElementById('admDashBar').style.width = `${percent}%`;
     document.getElementById('admDashRatio').innerText = `${audited} / ${total}`;
@@ -563,7 +564,7 @@ function updateSummaryCards() {
     renderAdminDashboardLists(damaged + lost);
   }
 
-  if (document.getElementById('execTotalAssets')) {
+  if (currentUser?.role === 'exec' && document.getElementById('execTotalAssets')) {
     const totalValue = activeAssets.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
     document.getElementById('execTotalAssets').innerText = total.toLocaleString();
     document.getElementById('execTotalValue').innerText = `฿${totalValue.toLocaleString('th-TH', { maximumFractionDigits: 0 })}`;
@@ -744,14 +745,14 @@ async function refreshCycles(initial=false){
 }
 async function openAuditCycleModal(){
   if(currentUser.role!=='admin')return;
-  try{await refreshCycles(); const options=auditCycles.map(r=>`${r.year} (${r.open?'เปิด':'ปิด'})`).join(', ');
+  try{loadingStart(); try{await refreshCycles();}finally{loadingEnd();} const options=auditCycles.map(r=>`${r.year} (${r.open?'เปิด':'ปิด'})`).join(', ');
   const r=await Swal.fire({title:'จัดการรอบตรวจ',text:options||'ยังไม่มีรอบตรวจ',html:'<label>ปี พ.ศ.</label><input id="cycleYear" type="number" min="2500" max="2700" class="swal2-input"><label>สถานะ</label><select id="cycleStatus" class="swal2-select"><option value="open">เปิดรอบตรวจ</option><option value="closed">ปิดรอบตรวจ</option></select>',didOpen:()=>{document.getElementById('cycleYear').value=document.getElementById('auditYear').value||new Date().getFullYear()+543;},showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>({year:document.getElementById('cycleYear').value,open:document.getElementById('cycleStatus').value==='open'})});
   if(r.isConfirmed){await adminApi('saveCycle',r.value);await refreshCycles(true);await loadAuditStatus();await Swal.fire('บันทึกแล้ว','','success');}
   }catch(e){Swal.fire('ข้อผิดพลาด',e.message,'error');}
 }
 async function openUserManagementModal(){
   if(currentUser.role!=='admin')return;
-  try{const j=await adminApi('getUsers');const choices={'__new__':'เพิ่มผู้ใช้งานใหม่'};j.data.forEach((u,i)=>choices[i]=u.username+' — '+u.fullName+' ('+u.role+', '+u.status+')');
+  try{loadingStart(); let j;try{j=await adminApi('getUsers');}finally{loadingEnd();}const choices={'__new__':'เพิ่มผู้ใช้งานใหม่'};j.data.forEach((u,i)=>choices[i]=u.username+' — '+u.fullName+' ('+u.role+', '+u.status+')');
   const pick=await Swal.fire({title:'จัดการผู้ใช้งาน',input:'select',inputOptions:choices,showCancelButton:true,confirmButtonText:'ดำเนินการ'});if(!pick.isConfirmed)return;
   const u=pick.value==='__new__'?{}:j.data[Number(pick.value)];
   const r=await Swal.fire({title:u.username?'แก้ไขผู้ใช้งาน':'เพิ่มผู้ใช้งาน',html:'<div class="text-left space-y-2"><label>Username<input id="umName" class="w-full border rounded-lg p-2"></label><label>PIN (4 หลัก; เว้นว่างเพื่อคงเดิม)<input id="umPin" type="password" inputmode="numeric" maxlength="4" class="w-full border rounded-lg p-2"></label><label>Full name<input id="umFull" class="w-full border rounded-lg p-2"></label><label>Role<select id="umRole" class="w-full border rounded-lg p-2"><option>user</option><option>admin</option><option>exec</option></select></label><label>Status<select id="umStatus" class="w-full border rounded-lg p-2"><option>Active</option><option>Deactive</option></select></label></div>',didOpen:()=>{for(const [id,v] of Object.entries({umName:u.username,umFull:u.fullName,umRole:u.role||'user',umStatus:u.status||'Active'}))document.getElementById(id).value=v||'';},showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>({originalUsername:u.username||'',newUsername:document.getElementById('umName').value,newPin:document.getElementById('umPin').value,fullName:document.getElementById('umFull').value,role:document.getElementById('umRole').value,status:document.getElementById('umStatus').value})});
@@ -969,6 +970,7 @@ function updateAuditSubmit() {
 }
 
 function openInspectScreen(code) {
+  if(!dataReady || loadingDepth){return;}
   const targetNorm = normalizeAssetCode(code);
   const asset = allAssets.find(a => normalizeAssetCode(a.assetCode) === targetNorm);
   if (!asset) {
@@ -1142,7 +1144,7 @@ function renderAdminTable() {
   const keyword = (document.getElementById('searchAdmin')?.value || '').toLowerCase();
   const tbody = document.getElementById('adminTableBody');
   if (!tbody) return;
-  tbody.innerHTML = '';
+  const rows = [];
 
   allAssets.forEach((asset, idx) => {
     const str = `${asset.assetCode} ${asset.assetName} ${asset.status}`.toLowerCase();
@@ -1151,7 +1153,7 @@ function renderAdminTable() {
     const state = getAssetAuditStatus(asset.assetCode, asset.status);
     const statusBadge = `<span class="${state.color} px-2 py-0.5 rounded-full text-xs">${state.label}</span>`;
 
-    tbody.innerHTML += `
+    rows.push(`
       <tr class="hover:bg-slate-50">
         <td class="p-2"><input type="checkbox" class="qr-checkbox" value="${asset.assetCode}"></td>
         <td class="p-2 font-mono text-xs">${asset.assetCode}</td>
@@ -1161,8 +1163,9 @@ function renderAdminTable() {
           <button type="button" onclick="openAdminModal('edit', ${idx})" class="text-blue-600 hover:underline text-xs font-medium">แก้ไข/จำหน่าย</button>
         </td>
       </tr>
-    `;
+    `);
   });
+  tbody.innerHTML=rows.join('');
 }
 
 const admEl = id => document.getElementById(id);
