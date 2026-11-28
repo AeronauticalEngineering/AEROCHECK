@@ -57,6 +57,15 @@ let execDeptChartInstance = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   updatePinDots();
+  const usernameField = document.getElementById('loginUsername');
+  usernameField.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.isComposing && document.getElementById('loginPin').value.length < 4) { e.preventDefault(); document.getElementById('pinKeypad').focus(); }
+  });
+  document.getElementById('loginForm').addEventListener('keydown', e => {
+    if (e.target === usernameField || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (/^\d$/.test(e.key)) { e.preventDefault(); pressPin(e.key); }
+    else if (e.key === 'Backspace') { e.preventDefault(); backspacePin(); }
+  });
   const savedSession = localStorage.getItem('asset_user_session');
   if (savedSession) {
     currentUser = JSON.parse(savedSession);
@@ -84,31 +93,28 @@ function updatePinDots() {
 }
 
 function pressPin(digit) {
-  if (isLoggingIn) return;
+  if (isLoggingIn || !/^\d$/.test(String(digit))) return;
+  const username = document.getElementById('loginUsername');
+  if (!username.value.trim()) { setLoginMessage('กรุณากรอกชื่อผู้ใช้ก่อน'); username.focus(); return; }
   const pinInput = document.getElementById('loginPin');
-  if (pinInput.value.length < 4) {
-    pinInput.value += String(digit);
-    updatePinDots();
+  if (pinInput.value.length >= 4) return;
+  if (document.activeElement === username) username.blur();
+  setLoginMessage('');
+  pinInput.value += String(digit);
+  updatePinDots();
+  if (pinInput.value.length === 4) handleLogin();
+}
 
-    if (pinInput.value.length === 4) {
-      const username = document.getElementById('loginUsername').value.trim();
-      if (!username) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'ยังไม่ได้ระบุชื่อผู้ใช้',
-          text: 'กรุณากรอกชื่อผู้ใช้ก่อนกดรหัส PIN',
-          timer: 1400,
-          showConfirmButton: false
-        });
-        clearPin();
-        return;
-      }
-      isLoggingIn = true;
-      setTimeout(() => {
-        handleLogin({ preventDefault: () => {} });
-      }, 120);
-    }
-  }
+function setLoginMessage(message) {
+  document.getElementById('loginMessage').textContent = message;
+}
+function setLoginBusy(busy) {
+  isLoggingIn = busy;
+  const form = document.getElementById('loginForm');
+  form.setAttribute('aria-busy', String(busy));
+  document.getElementById('loginUsername').readOnly = busy;
+  form.querySelectorAll('button').forEach(b => b.disabled = busy);
+  document.getElementById('loginSubmit').textContent = busy ? 'กำลังตรวจสอบสิทธิ์...' : 'เข้าสู่ระบบ';
 }
 
 function backspacePin() {
@@ -138,16 +144,16 @@ async function initData() {
 
 async function handleLogin(e) {
   if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  if (isLoggingIn || currentUser) return;
   const username = document.getElementById('loginUsername').value.trim();
   const pin = document.getElementById('loginPin').value.replace(/\D/g, '');
 
-  if (!/^\d{4}$/.test(pin)) {
-    isLoggingIn = false;
-    Swal.fire({ icon: 'warning', title: 'รหัส PIN ไม่ถูกต้อง', text: 'กรุณากดตัวเลข 4 หลักเท่านั้น', timer: 1400, showConfirmButton: false });
+  if (!username || !/^\d{4}$/.test(pin)) {
+    setLoginMessage(!username ? 'กรุณากรอกชื่อผู้ใช้' : 'กรุณากรอก PIN ให้ครบ 4 หลัก');
     return;
   }
-
-  Swal.fire({ title: 'กำลังตรวจสอบสิทธิ์...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  setLoginMessage('');
+  setLoginBusy(true);
 
   try {
     const res = await fetch(API_URL, {
@@ -155,8 +161,6 @@ async function handleLogin(e) {
       body: JSON.stringify({ action: 'login', username, pin })
     });
     const json = await res.json();
-    Swal.close();
-
     if (json.status === 'success') {
       const savedProfiles = JSON.parse(localStorage.getItem('asset_user_profiles') || '{}');
       const custom = savedProfiles[json.user.username] || {};
@@ -170,7 +174,8 @@ async function handleLogin(e) {
       };
       localStorage.setItem('asset_user_session', JSON.stringify(currentUser));
 
-      isLoggingIn = false;
+      setLoginBusy(false);
+      clearPin();
       applyRolePermissions();
       Swal.fire({
         icon: 'success',
@@ -182,14 +187,14 @@ async function handleLogin(e) {
       });
       initData();
     } else {
-      isLoggingIn = false;
+      setLoginBusy(false);
       clearPin();
-      Swal.fire('เข้าสู่ระบบไม่สำเร็จ', json.message, 'error');
+      setLoginMessage(json.message || 'เข้าสู่ระบบไม่สำเร็จ');
     }
   } catch (err) {
-    isLoggingIn = false;
+    setLoginBusy(false);
     clearPin();
-    Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+    setLoginMessage('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่');
   }
 }
 
