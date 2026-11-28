@@ -1261,11 +1261,19 @@ function showAdminDate() {
   const d = admEl('admAcquireDate').value.split('-');
   admEl('admDateThai').textContent = d.length === 3 ? `${d[2]}/${d[1]}/${Number(d[0])+543} (พ.ศ.)` : '';
 }
-function refreshAdminCategories() {
-  const main = admEl('admMainCategory').value;
-  for (const [id, values] of [['admMainList', allAssets.map(a=>a.mainCategory)], ['admSubList', allAssets.filter(a=>!main || a.mainCategory===main).map(a=>a.subCategory)]]) {
-    admEl(id).replaceChildren(...[...new Set(values.filter(Boolean))].sort().map(v=>{const o=document.createElement('option');o.value=v;return o;}));
-  }
+let master48=[];
+let masterOpening48=false;
+function fillMaster48(id, rows, old='') {
+ const el=admEl(id); el.replaceChildren(new Option('-- เลือก --',''));
+ for(const row of rows) el.add(new Option(row.name,row.name));
+ if(old && !rows.some(r=>r.name===old)) el.add(new Option(old+' (ข้อมูลเดิม)',old));
+ el.value=old;
+}
+function refreshAdminCategories(old='') {
+ const main=admEl('admMainCategory').value;
+ const ids=master48.filter(r=>r.group==='Category'&&r.name===main).map(r=>r.id);
+ fillMaster48('admSubCategory',master48.filter(r=>r.group==='SubCategory'&&ids.includes(r.parentId)),old);
+ admEl('admSubCategory').disabled=!main;
 }
 function refreshAdminQR() {
   const box=admEl('admQR'); box.replaceChildren();
@@ -1277,17 +1285,30 @@ function previewAdminImage(event) {
   if(f.size>5*1024*1024 || !['image/jpeg','image/png','image/webp'].includes(f.type)){event.target.value=''; Swal.fire('เลือกไฟล์ JPG, PNG หรือ WebP ไม่เกิน 5 MB','','warning');return;}
   const r=new FileReader();r.onload=()=>{if(event.target.files[0]!==f)return;admEl('admImagePreview').onload=admEl('admImagePreview').onerror=null;admEl('admImagePreview').src=r.result;admEl('admImagePreview').classList.remove('hidden');admEl('admImageLabel').textContent=f.name;};r.readAsDataURL(f);
 }
-function openAdminModal(mode,index=null) {
+async function openAdminModal(mode,index=null) {
   if(currentUser?.role!=='admin')return;
   const a=mode==='edit'?allAssets[index]:{}; if(!a)return;
+  if(masterOpening48)return;
+  masterOpening48=true; const actor=currentUser;
+  try {
+    Swal.fire({title:'กำลังโหลดตัวเลือก...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+    master48=(await adminApi('getMasterData')).data;
+    Swal.close();
+  }catch(err){Swal.fire('โหลด MasterData ไม่สำเร็จ',err.message,'error');return;}
+  finally{masterOpening48=false;}
+  if(currentUser!==actor)return;
   admEl('adminAssetForm').reset();
+  fillMaster48('admMainCategory',master48.filter(r=>r.group==='Category'),a.mainCategory||'');
+  fillMaster48('admBudget',master48.filter(r=>r.group==='Budget'),a.budget||'');
+  fillMaster48('admLocation',master48.filter(r=>r.group==='Location'),a.location||'');
+  refreshAdminCategories(a.subCategory||'');
   const fields={admMode:mode,admRowIndex:a.rowIndex,admId:a.id,admOriginalCode:a.assetCode,admCode:a.assetCode,admAcquireDate:a.acquireDate,admName:a.assetName,admPrice:a.price,admLocation:a.location,admHolder:a.holder,admStatus:mode==='add'?'ใช้งานได้':(a.rawStatus??a.status),admNote:a.note,admMainCategory:a.mainCategory,admSubCategory:a.subCategory,admBudget:a.budget};
   for(const [id,v] of Object.entries(fields))admEl(id).value=v??'';
   const status=fields.admStatus; if(status && ![...admEl('admStatus').options].some(o=>o.value===status)){admEl('admStatus').add(new Option(status,status));admEl('admStatus').value=status;}
   admEl('adminModalTitle').textContent=mode==='add'?'ลงครุภัณฑ์ใหม่':'แก้ไข / โอนย้าย / จำหน่ายครุภัณฑ์';
   admEl('admMetadata').textContent=`ID: ${a.id??'อัตโนมัติ'}\nลงทะเบียน: ${a.regDate||'-'}\nผู้บันทึก: ${a.updatedBy||'-'}\nวันที่บันทึก: ${a.updatedDate||'-'}`;
   showAssetImage(admEl('admImagePreview'), null, admEl('admImageLabel'), admEl('admImageLink'), a.imageUrl);
-  showAdminDate();if(a.acquireDateError)admEl('admDateThai').textContent='วันที่เดิมไม่ถูกต้อง: '+a.acquireDateError;refreshAdminCategories();refreshAdminQR();admEl('adminModal').classList.replace('hidden','flex');
+  showAdminDate();if(a.acquireDateError)admEl('admDateThai').textContent='วันที่เดิมไม่ถูกต้อง: '+a.acquireDateError;refreshAdminQR();admEl('adminModal').classList.replace('hidden','flex');
 }
 function closeAdminModal(){admEl('adminModal').classList.replace('flex','hidden');}
 async function saveAdminAsset(e){
