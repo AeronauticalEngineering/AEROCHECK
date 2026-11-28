@@ -56,6 +56,9 @@ let execDonutChartInstance = null;
 let execDeptChartInstance = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('loginForm').reset();
+  document.getElementById('loginUsername').value = '';
+  document.getElementById('loginPin').value = '';
   updatePinDots();
   const usernameField = document.getElementById('loginUsername');
   usernameField.addEventListener('keydown', e => {
@@ -418,14 +421,22 @@ function saveProfileChanges(e) {
 }
 
 function logout() {
-  stopScannerSilently();
   localStorage.removeItem('asset_user_session');
   currentUser = null;
-  isLoggingIn = false;
-  document.getElementById('appContainer').classList.add('hidden');
-  document.getElementById('loginModal').classList.remove('hidden');
+  document.activeElement?.blur();
+  setLoginBusy(false);
+  document.getElementById('loginForm').reset();
+  document.getElementById('loginUsername').value = '';
   document.getElementById('loginPin').value = '';
+  setLoginMessage('');
   updatePinDots();
+  allAssets = [];
+  auditedMap = {};
+  compressedImageBase64 = '';
+  tempAvatarBase64 = '';
+  stopScannerSilently();
+  // Reload to discard pending requests, rendered account data and temporary state.
+  window.location.reload();
 }
 
 function resolveHomeScreenId() {
