@@ -4,6 +4,7 @@ let allAssets = [];
 let auditedMap = {};
 let html5QrCode = null;
 let isScanning = false;
+let isScanHandling = false;
 let isLoggingIn = false;
 let currentUser = null;
 let compressedImageBase64 = '';
@@ -60,7 +61,7 @@ function pressPin(digit) {
       isLoggingIn = true;
       setTimeout(() => {
         handleLogin({ preventDefault: () => {} });
-      }, 150);
+      }, 120);
     }
   }
 }
@@ -389,12 +390,14 @@ function updateSummaryCards() {
 }
 
 async function openScannerScreen() {
+  isScanHandling = false;
   switchScreen('scanner');
   document.getElementById('cameraErrorBox').classList.add('hidden');
   document.getElementById('scanFrameOverlay').classList.remove('hidden');
   await startRearCamera();
 }
 
+// ปรับให้จับเฉพาะ QR_CODE, เพิ่ม fps เป็น 24 และตัดกรอบซ้อนออกให้เหลือเฉพาะกรอบสีฟ้าตรงกลาง
 async function startRearCamera() {
   document.getElementById('cameraErrorBox').classList.add('hidden');
 
@@ -410,10 +413,20 @@ async function startRearCamera() {
     await stopScannerSilently();
     document.getElementById('reader').innerHTML = '';
 
-    html5QrCode = new Html5Qrcode("reader", { verbose: false });
+    const qrOnlyFormats = typeof Html5QrcodeSupportedFormats !== 'undefined'
+      ? [Html5QrcodeSupportedFormats.QR_CODE]
+      : undefined;
+
+    html5QrCode = new Html5Qrcode("reader", {
+      formatsToSupport: qrOnlyFormats,
+      useBarCodeDetectorIfSupported: true,
+      verbose: false
+    });
 
     const onScanSuccess = async (decodedText) => {
-      if (!isScanning) return;
+      if (!isScanning || isScanHandling) return;
+      isScanHandling = true;
+
       let extractedCode = decodedText.trim();
       if (decodedText.includes('code=')) {
         try {
@@ -424,15 +437,24 @@ async function startRearCamera() {
       openInspectScreen(extractedCode);
     };
 
-    const config = { fps: 15, qrbox: { width: 220, height: 220 } };
+    const fastConfig = {
+      fps: 24,
+      qrbox: { width: 224, height: 224 },
+      aspectRatio: 1.0,
+      videoConstraints: {
+        facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    };
 
     try {
-      await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
+      await html5QrCode.start({ facingMode: "environment" }, fastConfig, onScanSuccess);
     } catch (_) {
       const cameras = await Html5Qrcode.getCameras();
       if (cameras && cameras.length > 0) {
         const backCam = cameras.find(c => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
-        await html5QrCode.start(backCam.id, config, onScanSuccess);
+        await html5QrCode.start(backCam.id, { fps: 24, qrbox: { width: 224, height: 224 } }, onScanSuccess);
       } else {
         throw new Error('No camera found');
       }
@@ -457,6 +479,7 @@ function showCameraError(title, desc) {
 }
 
 async function retryCamera() {
+  isScanHandling = false;
   await startRearCamera();
 }
 
