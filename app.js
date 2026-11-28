@@ -476,7 +476,7 @@ function resolveHomeScreenId() {
 }
 
 function switchScreen(screenName) {
-  if (['users','cycles'].includes(screenName) && currentUser?.role !== 'admin') return;
+  if (['users','cycles','master'].includes(screenName) && currentUser?.role !== 'admin') return;
   if (activeScreen === 'scanner' && screenName !== 'scanner') stopScannerSilently();
   activeScreen = screenName;
 
@@ -493,7 +493,7 @@ function switchScreen(screenName) {
     'screen-history',
     'screen-profile',
     'screen-admin',
-    'screen-users', 'screen-cycles'
+    'screen-users', 'screen-cycles', 'screen-master'
   ].forEach(s => {
     const el = document.getElementById(s);
     if (el) el.classList.add('hidden');
@@ -1442,3 +1442,12 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { e.preventDefault(); closeAssetImageModal(); }
   if (e.key === 'Tab') { e.preventDefault(); document.getElementById('assetImageModalClose').focus(); }
 });
+
+const mdGroups49={Category:'ประเภทหลัก',SubCategory:'ประเภทย่อย',Budget:'งบที่ซื้อ',Location:'ตำแหน่งที่ตั้ง'};
+let mdRows49=[],mdBusy49=false,mdId49='';
+const md49=id=>document.getElementById(id);
+async function openMaster49(){if(currentUser?.role!=='admin')return;switchScreen('master');await loadMaster49();}
+async function loadMaster49(){if(mdBusy49)return;mdBusy49=true;md49('mdError').textContent='กำลังโหลดข้อมูล...';try{mdRows49=(await adminApi('listMasterData')).data;renderMaster49();md49('mdError').textContent='';}catch(e){md49('mdError').textContent=e.message;}finally{mdBusy49=false;}}
+function renderMaster49(){const group=md49('mdGroup').value,q=md49('mdSearch').value.trim().toLowerCase(),f=md49('mdFilter').value;const all=mdRows49.filter(r=>r.group===group);md49('mdCount').textContent=`ทั้งหมด ${all.length} • เปิด ${all.filter(r=>r.active).length} • ปิด ${all.filter(r=>!r.active).length}`;const rows=all.filter(r=>(r.name+' '+r.id+' '+(mdRows49.find(p=>p.id===r.parentId)?.name||'')).toLowerCase().includes(q)&&(!f||r.active===(f==='on'))).sort((a,b)=>a.sort-b.sort||a.name.localeCompare(b.name,'th'));const list=md49('mdList');list.replaceChildren();for(const r of rows){const el=document.createElement('article');el.className='bg-white border rounded-2xl p-4 flex items-center gap-3';el.innerHTML=`<i class="bi bi-database text-blue-600"></i><div class="flex-1 min-w-0"><div class="font-bold break-words">${escape44(r.name)}</div><div class="text-xs text-slate-500">${escape44(mdRows49.find(p=>p.id===r.parentId)?.name||'')} • ลำดับ ${r.sort}</div><span class="text-xs ${r.active?'text-emerald-700':'text-slate-500'}">${r.active?'เปิดใช้งาน':'ปิดใช้งาน'}</span></div>`;const b=document.createElement('button');b.className='border rounded-xl px-3 py-2 text-blue-700';b.textContent='แก้ไข';b.onclick=()=>editMaster49(r.id);el.append(b);list.append(el);}if(!rows.length)list.textContent='ไม่พบรายการ';}
+function editMaster49(id=''){if(mdBusy49||currentUser?.role!=='admin')return;mdId49=id;const r=mdRows49.find(x=>x.id===id),group=r?.group||md49('mdGroup').value;md49('mdTitle').textContent=(r?'แก้ไข':'เพิ่ม')+mdGroups49[group];md49('mdName').value=r?.name||'';md49('mdSort').value=r?.sort??(Math.max(0,...mdRows49.filter(x=>x.group===group).map(x=>x.sort))+1);md49('mdActive').value=r&&!r.active?'off':'on';const parent=md49('mdParent');parent.replaceChildren(new Option('เลือกประเภทหลัก',''));for(const x of mdRows49.filter(x=>x.group==='Category'&&(x.active||x.id===r?.parentId)))parent.add(new Option(x.name,x.id));parent.value=r?.parentId||'';parent.disabled=!!r||group!=='SubCategory';md49('mdParentWrap').hidden=group!=='SubCategory';md49('mdDialog').dataset.group=group;md49('mdFormError').textContent='';md49('mdDialog').showModal();}
+async function saveMasterUI49(e){e.preventDefault();if(mdBusy49||currentUser?.role!=='admin')return;mdBusy49=true;md49('mdSave').disabled=true;try{const group=md49('mdDialog').dataset.group;const j=await adminApi('saveMasterData',{id:mdId49,group,name:md49('mdName').value,parentId:group==='SubCategory'?md49('mdParent').value:'',sort:Number(md49('mdSort').value),active:md49('mdActive').value==='on'});mdRows49=j.data;master48=[];renderMaster49();md49('mdDialog').close();md49('mdError').textContent='บันทึกเรียบร้อย';}catch(e){md49('mdFormError').textContent=e.message;}finally{mdBusy49=false;md49('mdSave').disabled=false;}}
