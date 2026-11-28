@@ -1269,8 +1269,10 @@ function fillMaster48(id, rows, old='') {
  if(old && !rows.some(r=>r.name===old)) el.add(new Option(old+' (ข้อมูลเดิม)',old));
  el.value=old;
 }
-function refreshAdminCategories(old='') {
+let originalMasterPair411 = null;
+function refreshAdminCategories(old) {
  const main=admEl('admMainCategory').value;
+ if(old===undefined) old=originalMasterPair411 && main===originalMasterPair411.main ? originalMasterPair411.sub : '';
  const ids=master48.filter(r=>r.group==='Category'&&r.name===main).map(r=>r.id);
  fillMaster48('admSubCategory',master48.filter(r=>r.group==='SubCategory'&&ids.includes(r.parentId)),old);
  admEl('admSubCategory').disabled=!main;
@@ -1301,6 +1303,7 @@ async function openAdminModal(mode,index=null) {
   fillMaster48('admMainCategory',master48.filter(r=>r.group==='Category'),a.mainCategory||'');
   fillMaster48('admBudget',master48.filter(r=>r.group==='Budget'),a.budget||'');
   fillMaster48('admLocation',master48.filter(r=>r.group==='Location'),a.location||'');
+  originalMasterPair411={main:a.mainCategory||'',sub:a.subCategory||''};
   refreshAdminCategories(a.subCategory||'');
   const fields={admMode:mode,admRowIndex:a.rowIndex,admId:a.id,admOriginalCode:a.assetCode,admCode:a.assetCode,admAcquireDate:a.acquireDate,admName:a.assetName,admPrice:a.price,admLocation:a.location,admHolder:a.holder,admStatus:mode==='add'?'ใช้งานได้':(a.rawStatus??a.status),admNote:a.note,admMainCategory:a.mainCategory,admSubCategory:a.subCategory,admBudget:a.budget};
   for(const [id,v] of Object.entries(fields))admEl(id).value=v??'';
@@ -1460,5 +1463,5 @@ function renderMaster49(){
  for(const r of rows){const el=document.createElement('article');el.className='md-item';const parent=mdRows49.find(p=>p.id===r.parentId)?.name||'';el.innerHTML=`<i class="bi bi-${icons[group]} text-blue-600 text-xl"></i><div class="flex-1 min-w-0 space-y-1"><div class="font-bold break-words">${escape44(r.name)}</div>${parent?`<div class="text-xs text-slate-500">${escape44(parent)}</div>`:''}<div class="text-sm text-slate-500">ลำดับ ${r.sort}</div><div class="text-xs ${r.active?'text-emerald-700':'text-slate-500'}"><i class="bi bi-${r.active?'check-circle':'dash-circle'}"></i> ${r.active?'เปิดใช้งาน':'ปิดใช้งาน'}</div></div>`;const b=document.createElement('button');b.type='button';b.className='md-edit';b.innerHTML='<i class="bi bi-pencil-square"></i> แก้ไข';b.onclick=()=>editMaster49(r.id);el.append(b);list.append(el);}
  if(!rows.length)list.textContent='ไม่พบรายการ';
 }
-function editMaster49(id=''){if(mdBusy49||currentUser?.role!=='admin')return;mdId49=id;const r=mdRows49.find(x=>x.id===id),group=r?.group||md49('mdGroup').value;md49('mdTitle').textContent=(r?'แก้ไข':'เพิ่ม')+mdGroups49[group];md49('mdName').value=r?.name||'';md49('mdSort').value=r?.sort??(Math.max(0,...mdRows49.filter(x=>x.group===group).map(x=>x.sort))+1);md49('mdActive').value=r&&!r.active?'off':'on';const parent=md49('mdParent');parent.replaceChildren(new Option('เลือกประเภทหลัก',''));for(const x of mdRows49.filter(x=>x.group==='Category'&&(x.active||x.id===r?.parentId)))parent.add(new Option(x.name,x.id));parent.value=r?.parentId||'';parent.disabled=!!r||group!=='SubCategory';md49('mdParentWrap').hidden=group!=='SubCategory';md49('mdDialog').dataset.group=group;md49('mdFormError').textContent='';md49('mdDialog').showModal();}
+function editMaster49(id=''){if(mdBusy49||currentUser?.role!=='admin')return;mdId49=id;const r=mdRows49.find(x=>x.id===id),group=r?.group||md49('mdGroup').value;md49('mdTitle').textContent=(r?'แก้ไข':'เพิ่ม')+mdGroups49[group];md49('mdName').value=r?.name||'';md49('mdSort').value=r?.sort??(Math.max(0,...mdRows49.filter(x=>x.group===group).map(x=>x.sort))+1);md49('mdActive').value=r&&!r.active?'off':'on';const parent=md49('mdParent');parent.replaceChildren(new Option('เลือกประเภทหลัก',''));for(const x of mdRows49.filter(x=>x.group==='Category'&&(x.active||x.id===r?.parentId)))parent.add(new Option(x.name,x.id));parent.value=r?.parentId||'';parent.disabled=group!=='SubCategory';md49('mdParentWrap').hidden=group!=='SubCategory';md49('mdDialog').dataset.group=group;md49('mdFormError').textContent='';md49('mdDialog').showModal();}
 async function saveMasterUI49(e){e.preventDefault();if(mdBusy49||currentUser?.role!=='admin')return;mdBusy49=true;md49('mdSave').disabled=true;try{const group=md49('mdDialog').dataset.group;const j=await adminApi('saveMasterData',{id:mdId49,group,name:md49('mdName').value,parentId:group==='SubCategory'?md49('mdParent').value:'',sort:Number(md49('mdSort').value),active:md49('mdActive').value==='on'});mdRows49=j.data;master48=[];renderMaster49();md49('mdDialog').close();md49('mdError').textContent='บันทึกเรียบร้อย';}catch(e){md49('mdFormError').textContent=e.message;}finally{mdBusy49=false;md49('mdSave').disabled=false;}}
