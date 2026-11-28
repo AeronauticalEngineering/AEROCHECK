@@ -659,71 +659,12 @@
 
   </div>
 
-  <!-- Modal เพิ่ม/แก้ไข/จำหน่ายครุภัณฑ์ -->
-  <div id="adminModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4 no-print">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto">
-      <div class="flex justify-between items-center border-b pb-3 mb-4">
-        <h3 class="font-bold text-lg" id="adminModalTitle">ลงครุภัณฑ์ใหม่</h3>
-        <button type="button" onclick="closeAdminModal()" class="text-slate-400 hover:text-slate-600"><i class="bi bi-x-lg"></i></button>
-      </div>
-      <form id="adminAssetForm" onsubmit="saveAdminAsset(event)" class="space-y-3 text-sm">
-        <input type="hidden" id="admMode">
-        <input type="hidden" id="admRowIndex">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs text-slate-600 mb-1">รหัสครุภัณฑ์ *</label>
-            <input type="text" id="admCode" required class="w-full border rounded-xl px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-600 mb-1">วันที่ได้มา</label>
-            <input type="text" id="admAcquireDate" class="w-full border rounded-xl px-3 py-2">
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs text-slate-600 mb-1">ชื่อครุภัณฑ์ *</label>
-          <input type="text" id="admName" required class="w-full border rounded-xl px-3 py-2">
-        </div>
-        <div class="grid grid-cols-3 gap-3">
-          <div>
-            <label class="block text-xs text-slate-600 mb-1">ราคา/หน่วย</label>
-            <input type="number" step="0.01" id="admPrice" class="w-full border rounded-xl px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-600 mb-1">ตำแหน่งที่ตั้ง</label>
-            <input type="text" id="admLocation" class="w-full border rounded-xl px-3 py-2">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-600 mb-1">ผู้รับผิดชอบ</label>
-            <input type="text" id="admHolder" class="w-full border rounded-xl px-3 py-2">
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs text-slate-600 mb-1">สถานะบัญชี</label>
-            <select id="admStatus" class="w-full border rounded-xl px-3 py-2 bg-white">
-              <option value="ใช้งานได้">ใช้งานได้</option>
-              <option value="ชำรุด">ชำรุด</option>
-              <option value="จำหน่าย">จำหน่าย (ตัดออกจากบัญชี)</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs text-slate-600 mb-1">หมายเหตุ</label>
-            <input type="text" id="admNote" class="w-full border rounded-xl px-3 py-2">
-          </div>
-        </div>
-        <div class="pt-2 flex justify-end gap-2">
-          <button type="button" onclick="closeAdminModal()" class="px-4 py-2 rounded-xl border">ยกเลิก</button>
-          <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 text-white font-semibold">บันทึกข้อมูล</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
+  <div id="adminModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-2 sm:p-4 no-print"><div class="bg-white rounded-2xl max-w-2xl w-full max-h-[95dvh] overflow-y-auto p-4 sm:p-5"><div class="flex justify-between items-center border-b pb-3 mb-3"><h3 id="adminModalTitle" class="font-bold text-lg"></h3><button type="button" onclick="closeAdminModal()" aria-label="ปิด"><i class="bi bi-x-lg"></i></button></div><form id="adminAssetForm" onsubmit="saveAdminAsset(event)" class="space-y-3 text-sm"><input type="hidden" id="admMode"><input type="hidden" id="admRowIndex"><input type="hidden" id="admOriginalCode"><input type="hidden" id="admId"><div class="border rounded-2xl p-3 space-y-3"><h4 class="font-semibold text-blue-700">ข้อมูลทะเบียน</h4><div class="grid grid-cols-1 sm:grid-cols-2 gap-3"><label class="block min-w-0"><span class="block text-xs text-slate-600 mb-1">รหัสครุภัณฑ์ *</span><input id="admCode" type="text" required oninput="refreshAdminQR()" class="w-full border rounded-xl px-3 py-2"></label><label class="block min-w-0"><span class="block text-xs text-slate-600 mb-1">วันที่ได้มา</span><input id="admAcquireDate" type="date" onchange="showAdminDate()" class="w-full border rounded-xl px-3 py-2"></label><p id="admDateThai" class="text-xs text-slate-500"></p></div><label class="block min-w-0"><span class="block text-xs text-slate-600 mb-1">ชื่อครุภัณฑ์ *</span><input id="admName" type="text" required class="w-full border rounded-xl px-3 py-2"></label><div class="grid grid-cols-1 sm:grid-cols-2 gap-3"><label class="block min-w-0"><span class="block text-xs text-slate-600 mb-1">ประเภทหลัก</span><input id="admMainCategory" type="text" list="admMainList" oninput="refreshAdminCategories()" class="w-full border rounded-xl px-3 py-2"></label><label class="block min-w-0"><span class="block text-xs text-slate-600 mb-1">ประเภทย่อย</span><input id="admSubCategory" type="text" list="admSubList" class="w-full border rounded-xl px-3 py-2"></label></div><datalist id="admMainList"></datalist><datalist id="admSubList"></datalist><div class="grid grid-cols-1 sm:grid-cols-2 gap-3"><label class="block min-w-0"><span class="block text-xs text-slate-600 mb-1">ราคา/หน่วย (บาท)</span><input id="admPrice" type="number" min="0" step="0.01" class="w-full border rounded-xl px-3 py-2"></label><label class="block min-w-0"><span class="block text-xs text-slate-600 mb-1">งบที่ซื้อ</span><input id="admBudget" type="text"  class="w-full border rounded-xl px-3 py-2"></label></div></div><div class="border rounded-2xl p-3 space-y-3"><h4 class="font-semibold text-blue-700">สถานที่และสถานะ</h4><div class="grid grid-cols-1 sm:grid-cols-2 gap-3"><label class="block min-w-0"><span class="block text-xs text-slate-600 mb-1">ตำแหน่งที่ตั้ง</span><input id="admLocation" type="text"  class="w-full border rounded-xl px-3 py-2"></label><label class="block min-w-0"><span class="block text-xs text-slate-600 mb-1">ผู้รับผิดชอบ</span><input id="admHolder" type="text"  class="w-full border rounded-xl px-3 py-2"></label></div><label class="block">สถานะบัญชี<select id="admStatus" class="w-full border rounded-xl px-3 py-2"><option value="">ยังไม่ระบุ</option><option>ใช้งานได้</option><option>ชำรุด</option><option>สูญหาย</option><option>จำหน่าย</option></select></label><label class="block">หมายเหตุ<textarea id="admNote" rows="2" class="w-full border rounded-xl px-3 py-2"></textarea></label></div><div class="border rounded-2xl p-3 space-y-3"><h4 class="font-semibold text-blue-700">รูปภาพและ QR Code</h4><div class="grid grid-cols-2 gap-3"><div><img id="admImagePreview" class="hidden max-h-32 object-contain" alt="รูปครุภัณฑ์"><p id="admImageLabel" class="text-xs text-slate-500">ไม่มีรูปภาพ</p><input id="admImageFile" type="file" accept="image/jpeg,image/png,image/webp" onchange="previewAdminImage(event)" class="w-full text-xs mt-2"></div><div><div id="admQR" class="flex justify-center"></div><p class="text-xs text-center mt-2">สร้างจากรหัสครุภัณฑ์</p></div></div></div><div class="border rounded-2xl p-3 space-y-3"><h4 class="font-semibold text-blue-700">ข้อมูลการบันทึก (อ่านอย่างเดียว)</h4><div id="admMetadata" class="text-xs text-slate-600 whitespace-pre-line"></div></div><div class="sticky bottom-0 bg-white py-3 flex justify-end gap-2 border-t"><button type="button" onclick="closeAdminModal()" class="px-4 py-2 rounded-xl border">ยกเลิก</button><button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 text-white font-semibold">บันทึกข้อมูล</button></div></form></div></div>
   <!-- พื้นที่พิมพ์สติกเกอร์ QR Code แสดงชื่อเต็ม -->
   <div id="printArea" class="hidden print-only p-3">
     <div id="qrGrid" class="grid grid-cols-3 gap-3"></div>
   </div>
 
-  <script src="app.js?v=20261128-smartqr2"></script>
+  <script src="app.js?v=20261128-adminv3"></script>
 </body>
 </html>
