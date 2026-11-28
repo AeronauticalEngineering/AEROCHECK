@@ -476,6 +476,7 @@ function resolveHomeScreenId() {
 }
 
 function switchScreen(screenName) {
+  if (screenName === 'users' && currentUser?.role !== 'admin') return;
   if (activeScreen === 'scanner' && screenName !== 'scanner') stopScannerSilently();
   activeScreen = screenName;
 
@@ -491,7 +492,8 @@ function switchScreen(screenName) {
     'screen-list',
     'screen-history',
     'screen-profile',
-    'screen-admin'
+    'screen-admin',
+    'screen-users'
   ].forEach(s => {
     const el = document.getElementById(s);
     if (el) el.classList.add('hidden');
@@ -775,15 +777,71 @@ async function openAuditCycleModal(){
   if(r.isConfirmed){await adminApi('saveCycle',r.value);await refreshCycles(true);await loadAuditStatus();await Swal.fire('บันทึกแล้ว','','success');}
   }catch(e){Swal.fire('ข้อผิดพลาด',e.message,'error');}
 }
+let umCache = null, umPage = 1, umBusy = false, umOriginal = '', umRequest = null;
+const um = id => document.getElementById(id);
+const umRoleLabel = r => ({admin:'Administrator',user:'User',exec:'Executive'})[r] || r;
 async function openUserManagementModal(){
-  if(currentUser.role!=='admin')return;
-  try{loadingStart(); let j;try{j=await adminApi('getUsers');loadingProgress(100,'โหลดข้อมูลเรียบร้อย');}finally{loadingEnd();}const choices={'__new__':'เพิ่มผู้ใช้งานใหม่'};j.data.forEach((u,i)=>choices[i]=u.username+' — '+u.fullName+' ('+u.role+', '+u.status+')');
-  const pick=await Swal.fire({title:'จัดการผู้ใช้งาน',input:'select',inputOptions:choices,showCancelButton:true,confirmButtonText:'ดำเนินการ'});if(!pick.isConfirmed)return;
-  const u=pick.value==='__new__'?{}:j.data[Number(pick.value)];
-  const r=await Swal.fire({title:u.username?'แก้ไขผู้ใช้งาน':'เพิ่มผู้ใช้งาน',html:'<div class="text-left space-y-2"><label>Username<input id="umName" class="w-full border rounded-lg p-2"></label><label>PIN (4 หลัก; เว้นว่างเพื่อคงเดิม)<input id="umPin" type="password" inputmode="numeric" maxlength="4" class="w-full border rounded-lg p-2"></label><label>Full name<input id="umFull" class="w-full border rounded-lg p-2"></label><label>Role<select id="umRole" class="w-full border rounded-lg p-2"><option>user</option><option>admin</option><option>exec</option></select></label><label>Status<select id="umStatus" class="w-full border rounded-lg p-2"><option>Active</option><option>Deactive</option></select></label></div>',didOpen:()=>{for(const [id,v] of Object.entries({umName:u.username,umFull:u.fullName,umRole:u.role||'user',umStatus:u.status||'Active'}))document.getElementById(id).value=v||'';},showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>({originalUsername:u.username||'',newUsername:document.getElementById('umName').value,newPin:document.getElementById('umPin').value,fullName:document.getElementById('umFull').value,role:document.getElementById('umRole').value,status:document.getElementById('umStatus').value})});
-  if(r.isConfirmed){await adminApi('saveUser',r.value);if(u.username?.toLowerCase()===currentUser.username.toLowerCase()){currentUser.username=r.value.newUsername.trim();currentUser.pin=r.value.newPin||currentUser.pin;currentUser.fullName=r.value.fullName;localStorage.setItem('asset_user_session',JSON.stringify(currentUser));applyRolePermissions();}await Swal.fire('บันทึกแล้ว','','success');}
-  }catch(e){Swal.fire('ข้อผิดพลาด',e.message,'error');}
+  if(currentUser?.role !== 'admin') return;
+  switchScreen('users');
+  if(umCache !== null) { renderUsers46(); return; }
+  await refreshUsers46();
 }
+async function refreshUsers46(){
+  if(currentUser?.role !== 'admin' || umRequest || umBusy) return;
+  um('umError').textContent='';
+  loadingStart(); loadingProgress(20,'กำลังดึงรายชื่อผู้ใช้งาน');
+  try {
+    umRequest=adminApi('getUsers'); const j=await umRequest;
+    umCache=j.data; umPage=1; renderUsers46(); loadingProgress(100,'โหลดข้อมูลเรียบร้อย');
+  } catch(e){um('umError').textContent=e.message;}
+  finally{umRequest=null;loadingEnd();}
+}
+function filterUsers46(){umPage=1;renderUsers46();}
+function renderUsers46(){
+  const all=umCache||[], q=um('umSearch').value.trim().toLowerCase(), role=um('umFilterRole').value, status=um('umFilterStatus').value;
+  um('umTotal').textContent=all.length; um('umActive').textContent=all.filter(u=>u.status==='Active').length; um('umInactive').textContent=all.filter(u=>u.status!=='Active').length;
+  const rows=all.filter(u=>(u.username+' '+u.fullName).toLowerCase().includes(q)&&(!role||u.role===role)&&(!status||u.status===status)).sort((a,b)=>String(a[um('umSort').value]).localeCompare(String(b[um('umSort').value]),'th',{numeric:true}));
+  const pages=Math.max(1,Math.ceil(rows.length/20)); umPage=Math.min(pages,Math.max(1,umPage));
+  um('umCount').textContent=`พบ ${rows.length} จาก ${all.length} คน`; um('umPage').textContent=`หน้า ${umPage} / ${pages}`; um('umPrev').disabled=umPage===1;um('umNext').disabled=umPage===pages;
+  const icon=r=>({admin:'shield-check',exec:'briefcase',user:'person'})[r]||'person';
+  const tone=r=>({admin:'bg-violet-100 text-violet-700',exec:'bg-amber-100 text-amber-700',user:'bg-blue-100 text-blue-700'})[r]||'bg-slate-100';
+  const badge=u=>`<span class="inline-block rounded-full px-2 py-1 text-xs ${u.status==='Active'?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700'}">${escape44(u.status)}</span>`;
+  const edit=u=>`<button type="button" data-um-edit="${escape44(u.username)}" class="border rounded-xl px-3 py-2 text-blue-700 text-sm"><i class="bi bi-pencil-square"></i> แก้ไข</button>`;
+  const visible=rows.slice((umPage-1)*20,umPage*20);
+  um('umTable').innerHTML=visible.map(u=>`<tr class="border-t"><td class="p-3 font-medium">${escape44(u.username)}</td><td class="p-3">${escape44(u.fullName)}</td><td class="p-3"><span class="rounded-lg px-2 py-1 ${tone(u.role)}"><i class="bi bi-${icon(u.role)}"></i> ${escape44(umRoleLabel(u.role))}</span></td><td class="p-3">${badge(u)}</td><td class="p-3">${edit(u)}</td></tr>`).join('');
+  um('umCards').innerHTML=visible.map(u=>`<article class="border rounded-2xl p-3 bg-white space-y-3"><div class="flex items-center gap-3"><span class="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center ${tone(u.role)}"><i class="bi bi-${icon(u.role)} text-xl"></i></span><div class="min-w-0 flex-1 break-words"><div class="font-bold">${escape44(u.fullName)}</div><div class="text-sm text-slate-500">@${escape44(u.username)}</div></div>${edit(u)}</div><div class="flex justify-between items-center text-sm text-slate-600">${escape44(umRoleLabel(u.role))}${badge(u)}</div></article>`).join('');
+  um('umEmpty').classList.toggle('hidden',rows.length!==0);
+}
+function changeUsersPage46(delta){umPage+=delta;renderUsers46();}
+function openUserEditor46(username=''){
+  if(currentUser?.role!=='admin'||umBusy||umCache===null)return;
+  const u=username?umCache.find(x=>x.username===username):null;if(username&&!u)return;
+  umOriginal=username;um('umForm').reset();um('umTitle').textContent=u?'แก้ไขผู้ใช้งาน':'เพิ่มผู้ใช้งานใหม่';
+  um('umName').value=u?.username||'';um('umFull').value=u?.fullName||'';um('umRole').value=u?.role||'user';um('umStatus').value=u?.status||'Active';
+  um('umPin').required=!u;um('umPin').placeholder=u?'เว้นว่างเพื่อคง PIN เดิม':'ระบุ PIN 4 หลัก';um('umFormError').textContent='';
+  const self=username.toLowerCase()===currentUser.username.toLowerCase();um('umRole').disabled=self;um('umStatus').disabled=self;
+  um('umDialog').showModal();
+}
+function closeUserEditor46(){if(!umBusy){um('umPin').value='';um('umDialog').close();}}
+async function saveUser46(e){
+  e.preventDefault();if(umBusy||currentUser?.role!=='admin')return;
+  const d={originalUsername:umOriginal,newUsername:um('umName').value.trim(),newPin:um('umPin').value,fullName:um('umFull').value.trim(),role:um('umRole').value,status:um('umStatus').value};
+  const err=um('umFormError');err.textContent='';
+  if(!/^[a-zA-Z0-9_.-]+$/.test(d.newUsername)||!d.fullName||((!umOriginal||d.newPin)&&!/^\d{4}$/.test(d.newPin))){err.textContent='กรุณาตรวจสอบ Username ชื่อ และ PIN 4 หลัก';return;}
+  if(umCache.some(u=>u.username.toLowerCase()===d.newUsername.toLowerCase()&&u.username!==umOriginal)){err.textContent='Username ซ้ำ';return;}
+  umBusy=true;um('umSave').disabled=true;um('umSave').textContent='กำลังบันทึก...';
+  try{
+    await adminApi('saveUser',d);
+    if(umOriginal.toLowerCase()===currentUser.username.toLowerCase()){
+      currentUser.username=d.newUsername;currentUser.pin=d.newPin||currentUser.pin;currentUser.fullName=d.fullName;localStorage.setItem('asset_user_session',JSON.stringify(currentUser));applyRolePermissions();
+    }
+    const item={username:d.newUsername,fullName:d.fullName,role:d.role,status:d.status};
+    umCache=umOriginal?umCache.map(u=>u.username===umOriginal?item:u):[...umCache,item];
+    um('umPin').value='';um('umDialog').close();renderUsers46();um('umNotice').textContent='บันทึกข้อมูลเรียบร้อย';
+  }catch(ex){err.textContent=ex.message;}
+  finally{umBusy=false;um('umSave').disabled=false;um('umSave').textContent='บันทึกข้อมูล';}
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-um-edit]');if(b)openUserEditor46(b.dataset.umEdit);});
 
 function extractCodeFromScan(decodedText) {
   let raw = String(decodedText || '').trim();
